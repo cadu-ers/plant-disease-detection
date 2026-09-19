@@ -36,8 +36,9 @@ seguintes etapas:
      fixa de cor, regiões da própria folha saudável com brilho, sombra ou
      pequenos furos de inseto também podem ser removidas (aparecendo como
      "buracos" pretos na imagem segmentada), mesmo sem indicar doença.
-     Optamos por manter essa abordagem por ser simples e eficiente dentro
-     do prazo do projeto, mas o ideal em uma versão futura seria usar
+     Optamos por manter essa abordagem por ser simples e eficiente,
+     mantendo esses "buracos" como uma limitação conhecida do método.
+     Na próxima entrega (P2), pretendemos aprimorar essa etapa utilizando
      preenchimento de contornos (`cv2.fillPoly`) para manter apenas o
      contorno externo da folha como máscara.
 5. **Extração de features clássicas** (complementar): histograma de cor
