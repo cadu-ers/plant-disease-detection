@@ -2,6 +2,9 @@
 data/
 data_processed/
 
+# Resultados de testes locais da rotina de demonstração
+rotina_demo/
+
 # Features geradas
 features.csv
 

@@ -23,13 +23,12 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
-from tensorflow.keras import layers, models
-from tensorflow.keras.applications import MobileNetV2
 from sklearn.metrics import classification_report, confusion_matrix
+
+from model_utils import build_model, IMG_SIZE
 
 # ---------- Configurações ----------
 DATA_DIR = "data_processed"
-IMG_SIZE = (160, 160)
 BATCH_SIZE = 32
 INITIAL_EPOCHS = 8
 FINE_TUNE_EPOCHS = 5
@@ -64,30 +63,6 @@ def load_datasets():
     val_ds = val_ds.cache().prefetch(buffer_size=AUTOTUNE)
 
     return train_ds, val_ds, class_names
-
-
-def build_model(num_classes):
-    base_model = MobileNetV2(
-        input_shape=IMG_SIZE + (3,),
-        include_top=False,
-        weights="imagenet",
-    )
-    base_model.trainable = False  # congela a base pré-treinada
-
-    inputs = tf.keras.Input(shape=IMG_SIZE + (3,))
-    x = tf.keras.applications.mobilenet_v2.preprocess_input(inputs)
-    x = base_model(x, training=False)
-    x = layers.GlobalAveragePooling2D()(x)
-    x = layers.Dropout(0.2)(x)
-    outputs = layers.Dense(num_classes, activation="softmax")(x)
-    model = models.Model(inputs, outputs)
-
-    model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
-        loss="sparse_categorical_crossentropy",
-        metrics=["accuracy"],
-    )
-    return model, base_model
 
 
 def plot_history(history_initial, history_fine, path="reports/training_history.png"):
@@ -131,6 +106,11 @@ def main():
 
     print("\nConstruindo modelo (MobileNetV2 + head customizada)...")
     model, base_model = build_model(num_classes=len(class_names))
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
+        loss="sparse_categorical_crossentropy",
+        metrics=["accuracy"],
+    )
     model.summary()
 
     early_stop = tf.keras.callbacks.EarlyStopping(
