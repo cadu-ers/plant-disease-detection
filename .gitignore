@@ -1,0 +1,29 @@
+# Dataset (não versionar imagens — link fica no README)
+data/
+data_processed/
+
+# Features geradas
+features.csv
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+venv/
+env/
+.venv/
+
+# Modelos treinados (geralmente grandes)
+*.h5
+*.pt
+*.pth
+*.keras
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
