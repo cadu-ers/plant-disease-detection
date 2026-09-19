@@ -133,16 +133,3 @@ python src/preprocessing.py
 python src/train_model.py
 python src/demo.py
 ```
-
-## Observações técnicas
-
-**Carregamento do modelo (`demo.py`)**: o modelo é salvo em formato `.h5`
-ao final do treino. Esse formato, ao usar operações do TensorFlow
-aplicadas diretamente sobre os tensores dentro da arquitetura (no caso, o
-`preprocess_input` da MobileNetV2), gera camadas internas que o Keras não
-consegue desserializar de volta via `load_model()`. Para contornar isso
-sem precisar retreinar, `demo.py` reconstrói a arquitetura do modelo em
-código (função `build_model()` em `model_utils.py`, reaproveitada também
-pelo treino) e carrega apenas os pesos salvos, por nome de camada
-(`model.load_weights(..., by_name=True)`), em vez de carregar o modelo
-completo.

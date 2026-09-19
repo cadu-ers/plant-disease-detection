@@ -20,11 +20,10 @@ import cv2
 import matplotlib.pyplot as plt
 import tensorflow as tf
 
-from model_utils import build_model, IMG_SIZE
-
 DATA_DIR = "data"
-MODEL_PATH = "models/plant_disease_model.h5"
+MODEL_PATH = "models/plant_disease_model.keras"
 OUTPUT_DIR = "rotina_demo"
+IMG_SIZE = (160, 160)
 
 LOWER_GREEN = np.array([25, 40, 40])
 UPPER_GREEN = np.array([90, 255, 255])
@@ -119,11 +118,7 @@ def main():
         if os.path.isdir(os.path.join(DATA_DIR, d))
     )
 
-    # Reconstrói a arquitetura (mesmo código do treino) e carrega só os
-    # pesos, evitando o problema de compatibilidade do Keras ao
-    # desserializar o modelo completo salvo em .h5.
-    model, _ = build_model(num_classes=len(class_names), weights=None)
-    model.load_weights(MODEL_PATH, by_name=True, skip_mismatch=True)
+    model = tf.keras.models.load_model(MODEL_PATH)
 
     original, segmented = segment(img_path)
     predicted_class, confidence, top3 = predict(model, segmented, class_names)
@@ -134,4 +129,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    

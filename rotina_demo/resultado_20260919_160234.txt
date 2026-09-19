@@ -1,8 +1,0 @@
-Classe real: Potato___healthy
-Classe predita: Tomato_healthy
-Confiança: nan%
-
-Top 3 predições:
-  Tomato_healthy: nan%
-  Tomato__Tomato_mosaic_virus: nan%
-  Tomato__Tomato_YellowLeaf__Curl_Virus: nan%

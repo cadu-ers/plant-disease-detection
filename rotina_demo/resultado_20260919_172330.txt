@@ -1,0 +1,8 @@
+Classe real: Potato___Early_blight
+Classe predita: Potato___Early_blight
+Confiança: 99.7%
+
+Top 3 predições:
+  Potato___Early_blight: 99.7%
+  Tomato_Septoria_leaf_spot: 0.2%
+  Tomato_Early_blight: 0.1%

@@ -145,7 +145,7 @@ def main():
     )
 
     print("\nSalvando modelo...")
-    model.save("models/plant_disease_model.h5")
+    model.save("models/plant_disease_model.keras")
 
     plot_history(history_initial, history_fine)
 
