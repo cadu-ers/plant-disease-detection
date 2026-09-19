@@ -2,7 +2,7 @@
 
 Pipeline de processamento de imagens integrado a um modelo de IA (transfer
 learning) para identificação de doenças em folhas de tomate e batata, a
-partir do dataset PlantVillage.
+partir do dataset PlantVillage. (https://www.kaggle.com/datasets/emmarex/plantdisease/data)
 
 ## Integrantes da equipe
 
