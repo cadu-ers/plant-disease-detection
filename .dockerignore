@@ -1,0 +1,11 @@
+.git
+.venv
+venv
+env
+__pycache__/
+*.py[cod]
+data/
+data_processed/
+models/
+rotina_demo/
+features.csv
