@@ -1,5 +1,6 @@
 # Dataset (não versionar imagens — link fica no README)
-data/
+data/*
+!data/.gitkeep
 data_processed/
 
 # Resultados de testes locais da rotina de demonstração

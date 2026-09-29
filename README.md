@@ -110,9 +110,7 @@ Utilizamos um subconjunto do dataset, com as classes de **tomate** e
 
 ```
 .
-├── data/                  # dataset original (não versionado, ver .gitignore)
-├── data_processed/        # imagens após o pipeline de PI (não versionado)
-├── models/                # modelo treinado (não versionado)
+├── data/                  # implementar o dataset nessa pasta!
 ├── reports/               # gráfico de treino e relatório de classificação
 ├── src/
 │   ├── preprocessing.py    # pipeline de processamento de imagens
@@ -120,7 +118,6 @@ Utilizamos um subconjunto do dataset, com as classes de **tomate** e
 │   ├── train_model.py      # treino do modelo de IA
 │   ├── demo.py             # rotina de demonstração (predição em uma imagem)
 │   └── histogram_analysis.py  # script de documentação (histograma antes/depois da normalização)
-├── features.csv           # features clássicas extraídas (não versionado)
 ├── requirements.txt
 └── README.md
 ```
