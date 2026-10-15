@@ -91,7 +91,13 @@ def evaluate(model, val_ds, class_names):
         y_pred.extend(np.argmax(preds, axis=1))
         y_true.extend(labels.numpy())
 
-    report = classification_report(y_true, y_pred, target_names=class_names)
+    report = classification_report(
+    y_true,
+    y_pred,
+    labels=range(len(class_names)),
+    target_names=class_names,
+    zero_division=0
+    )
     print(report)
 
     with open("reports/classification_report.txt", "w", encoding="utf-8") as f:

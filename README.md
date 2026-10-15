@@ -99,6 +99,12 @@ Para instalar:
 pip install -r requirements.txt
 ```
 
+Para baixar o data set e prepará-las em `data/`:
+
+```bash
+python src/download_dataset.py
+```
+
 ## Dataset
 
 - [PlantVillage Dataset (Kaggle)](https://www.kaggle.com/datasets/emmarex/plantdisease)
@@ -110,9 +116,7 @@ Utilizamos um subconjunto do dataset, com as classes de **tomate** e
 
 ```
 .
-├── data/                  # dataset original (não versionado, ver .gitignore)
-├── data_processed/        # imagens após o pipeline de PI (não versionado)
-├── models/                # modelo treinado (não versionado)
+├── data/                  # implementar o dataset nessa pasta!
 ├── reports/               # gráfico de treino e relatório de classificação
 ├── src/
 │   ├── preprocessing.py    # pipeline de processamento de imagens
@@ -120,7 +124,6 @@ Utilizamos um subconjunto do dataset, com as classes de **tomate** e
 │   ├── train_model.py      # treino do modelo de IA
 │   ├── demo.py             # rotina de demonstração (predição em uma imagem)
 │   └── histogram_analysis.py  # script de documentação (histograma antes/depois da normalização)
-├── features.csv           # features clássicas extraídas (não versionado)
 ├── requirements.txt
 └── README.md
 ```
@@ -129,7 +132,26 @@ Utilizamos um subconjunto do dataset, com as classes de **tomate** e
 
 ```bash
 pip install -r requirements.txt
+python src/download_dataset.py
 python src/preprocessing.py
 python src/train_model.py
 python src/demo.py
+```
+
+## Docker
+
+Com Docker Desktop e o Docker Compose instalados, construa a imagem:
+
+```bash
+docker compose build
+```
+
+Execute cada etapa do pipeline em um container. Os arquivos gerados ficam no
+workspace, pois o projeto é montado em `/app`:
+
+```bash
+docker compose run --rm app python src/download_dataset.py
+docker compose run --rm app python src/preprocessing.py
+docker compose run --rm app python src/train_model.py
+docker compose run --rm app python src/demo.py
 ```
