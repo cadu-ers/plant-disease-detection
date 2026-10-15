@@ -1,6 +1,4 @@
 """
-Rotina simples de demonstração para a prova prática.
-
 Pega uma imagem (aleatória ou informada), roda o pipeline de
 processamento de imagem + predição do modelo, e salva o resultado
 (imagem + texto) na pasta rotina_demo/.
