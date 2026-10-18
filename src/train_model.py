@@ -19,11 +19,11 @@ Uso:
 Gera:
     models/plant_disease_model.keras
     models/class_names.json
-    reports/cnn/training_history.png
-    reports/cnn/classification_report.txt
-    reports/cnn/confusion_matrix.png
-    reports/cnn/metrics_cnn.json
-    reports/cnn/history.json        -> métricas por época das duas etapas (com learning rate)
+    reports/ia/cnn/training_history.png
+    reports/ia/cnn/classification_report.txt
+    reports/ia/cnn/confusion_matrix.png
+    reports/ia/cnn/metrics_cnn.json
+    reports/ia/cnn/history.json     -> métricas por época das duas etapas (com learning rate)
 """
 
 import json

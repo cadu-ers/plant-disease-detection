@@ -53,6 +53,53 @@ O `run_ia.py` verifica antes se `data_processed/` e
 
 A demonstração (`python src/demo.py`) continua separada dos orquestradores.
 
+## Demonstração do Processamento de Imagens (`demo_pi.py`)
+
+Mostra, em uma imagem, todo o bloco de PI: as etapas da segmentação, a FFT e
+os histogramas HSV com as faixas e limiares reais do `config.py`, além das
+medidas da imagem comparadas com a mediana da classe. Não usa nada do bloco de
+IA (não importa `tensorflow`, não lê `models/` nem `features_cache/`, exceto o
+`fft_features.csv` gerado pelo `fft_analysis.py`).
+
+```bash
+python src/demo_pi.py                              # imagem aleatória do TESTE (manifest)
+python src/demo_pi.py --classe Tomato_Early_blight # aleatória do teste dessa classe
+python src/demo_pi.py caminho/da/imagem.jpg        # imagem específica
+python src/demo_pi.py --seed 7                     # sorteio reprodutível
+python src/demo_pi.py --sem-janela                 # só salva, não abre janela
+```
+
+As opções podem ser combinadas (ex.: `--classe Tomato_Early_blight --seed 42
+--sem-janela`); só não é possível usar um caminho de imagem junto com
+`--classe`. Para uma imagem informada, a classe real e o split vêm do
+manifest; se ela não estiver no manifest, a classe vem do nome da pasta (se for
+uma classe de `data/`) ou fica desconhecida.
+
+A figura tem 3 linhas:
+
+1. **Segmentação**: original, blur gaussiano, canal H, máscara verde, máscara
+   de lesão, máscara final (contorno preenchido) e folha segmentada. O script
+   confere que a máscara final é idêntica à de `segment_image`.
+2. **FFT**: imagem preparada (como no `fft_analysis.py`), log da magnitude,
+   passa-baixa (D0 = 15), passa-alta e um quadro com as medidas.
+3. **Histogramas (espaço HSV da imagem suavizada)**: canal H da imagem inteira
+   e só da folha, com as faixas de matiz verde, de lesão e a faixa H 25–35, que
+   pertence às duas; canais S e V da folha e do fundo, com os limiares mínimos
+   S e V da máscara de lesão.
+
+Medidas (no terminal e no quadro da figura): fração da imagem ocupada pela
+folha, proporção de lesão na folha, % dos pixels da folha nas faixas verde e de
+lesão e razão de energia alta/baixa frequência (corte em 0.25 de Nyquist). A
+fração de folha, a proporção de lesão e a razão alta/baixa vêm acompanhadas da
+mediana da classe real, calculada a partir de
+`reports/pi/segmentacao/qualidade_segmentacao.csv` e
+`features_cache/fft_features.csv`; se algum deles não existir, aparece só o
+valor da imagem.
+
+Saídas em `rotina_demo/pi/`: `resultado_<timestamp>.png` (figura),
+`resultado_<timestamp>.json` (caminho, classe real, split e medidas) e
+`ultima.json` (cópia do último resultado, usada pelo `demo_ia --ultima-pi`).
+
 ## Execução manual, script por script
 
 ```bash
@@ -141,15 +188,16 @@ O `Dockerfile` instala só o `requirements.txt` (sem o `pytest`).
 │   ├── class_names.json    # ordem das classes usada no treino
 │   └── svm_hybrid.joblib   # melhor pipeline do classificador híbrido (gerado por hybrid_classifier.py)
 ├── reports/
-│   ├── baseline_v1/        # relatórios do modelo antigo + README explicando o que mudou
-│   ├── cnn_run1/           # relatórios da rodada 1 da CNN + README com o diagnóstico
-│   ├── dados/              # exemplos por classe e resumo do dataset (data_overview.py)
-│   ├── fft/                # análise no domínio da frequência (fft_analysis.py)
-│   ├── cnn/                # saídas do train_model.py (relatório, matriz de confusão, métricas, histórico)
-│   ├── hybrid/             # saídas do hybrid_classifier.py (métricas, comparativo, McNemar, controle)
-│   ├── segmentation/       # comparações, etapas e verificação objetiva da segmentação
-│   ├── split_summary.csv   # contagem de imagens por classe x split
-│   └── histograma_exemplo.png  # saída do histogram_analysis.py (material da P1)
+│   ├── pi/                 # bloco 1: Processamento de Imagens (índice em pi/LEIAME.md)
+│   │   ├── dados/          # exemplos por classe, resumo do dataset e split_summary.csv
+│   │   ├── segmentacao/    # etapas, comparação antiga x nova e verificação objetiva da segmentação
+│   │   │   └── estudo_limiares/  # comparações com outros limiares S/V da máscara de lesão
+│   │   ├── fft/            # análise no domínio da frequência (fft_analysis.py)
+│   │   └── p1_histograma/  # histograma antes/depois da normalização (material da P1)
+│   └── ia/                 # bloco 2: Inteligência Artificial (índice em ia/LEIAME.md)
+│       ├── cnn/            # saídas do train_model.py (relatório, matriz de confusão, métricas, histórico)
+│       ├── hibrido/        # saídas do hybrid_classifier.py (métricas, comparativo, McNemar, controle)
+│       └── historico/      # rodadas antigas: baseline_v1/ e cnn_run1/, cada uma com README
 ├── src/
 │   │   # Orquestração
 │   ├── run_pi.py           # bloco 1: Processamento de Imagens, etapa por etapa
@@ -163,8 +211,8 @@ O `Dockerfile` instala só o `requirements.txt` (sem o `pytest`).
 │   ├── download_dataset.py # baixa o PlantVillage e copia as classes de tomate/batata para data/
 │   ├── preprocessing.py    # pipeline de processamento de imagens (segmentação -> data_processed/)
 │   ├── split_dataset.py    # divisão estratificada treino/val/teste (70/15/15) -> data_split/ + manifest
-│   ├── data_overview.py    # exemplos por classe e resumo de resolução/formato (reports/dados/)
-│   ├── segmentation_report.py # etapas, verificação objetiva e comparação antiga x nova (reports/segmentation/)
+│   ├── data_overview.py    # exemplos por classe e resumo de resolução/formato (reports/pi/dados/)
+│   ├── segmentation_report.py # etapas, verificação objetiva e comparação antiga x nova (reports/pi/segmentacao/)
 │   ├── fft_analysis.py     # FFT: espectros, magnitude x fase, teorema da convolução, descritores
 │   ├── features.py         # features clássicas da folha (cor, lesão, GLCM, LBP) para o classificador híbrido
 │   ├── histogram_analysis.py  # histograma antes/depois da normalização (material da P1, fora do pipeline)
@@ -175,6 +223,7 @@ O `Dockerfile` instala só o `requirements.txt` (sem o `pytest`).
 │   ├── hybrid_classifier.py  # SVMs (clássicas / CNN / híbrido) x CNN no teste + McNemar + controle
 │   ├── expert_system/      # sistema especialista: base de conhecimento (YAML), motor de inferência e diagnose.py
 │   │   # Demo e testes
+│   ├── demo_pi.py          # demonstração do Processamento de Imagens (segmentação, FFT, histogramas HSV)
 │   ├── demo.py             # rotina de demonstração (predição em uma imagem)
 │   └── tests/              # testes automatizados do sistema especialista (pytest)
 ├── requirements.txt        # dependências para rodar o projeto

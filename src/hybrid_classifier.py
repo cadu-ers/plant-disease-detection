@@ -45,7 +45,7 @@ Uso:
     python src/hybrid_classifier.py --replot              -> só regera o comparativo.png principal
     (requer features_cache/ gerado por src/extract_features.py)
 
-Gera (em reports/hybrid/):
+Gera (em reports/ia/hibrido/):
     metrics_<modelo>.json, classification_report_<modelo>.txt  (os 4 modelos)
     grid_search_<modelo>.csv                                   (os 3 SVMs)
     confusion_matrix_SVM_hibrido.png
@@ -53,7 +53,7 @@ Gera (em reports/hybrid/):
     mcnemar.txt
 e models/svm_hybrid.joblib (melhor pipeline híbrido).
 O controle gera metrics_<modelo>.json, classification_report_<modelo>.txt,
-comparativo.csv, comparativo.png e mcnemar.txt em reports/hybrid/controle_refit_treino/,
+comparativo.csv, comparativo.png e mcnemar.txt em reports/ia/hibrido/controle_refit_treino/,
 sem tocar nos arquivos principais nem no modelo salvo.
 """
 
@@ -81,11 +81,11 @@ from sklearn.svm import SVC  # noqa: E402
 
 from config import (  # noqa: E402
     CLASS_NAMES_PATH, CNN_EMBEDDINGS_PATH, CNN_REPORTS_DIR, CNN_TEST_PRED_PATH,
-    HANDCRAFTED_PATH, HYBRID_MODEL_PATH, HYBRID_REPORTS_DIR, MODELS_DIR, SEED,
+    HANDCRAFTED_PATH, HYBRID_CONTROL_REPORTS_DIR, HYBRID_MODEL_PATH, HYBRID_REPORTS_DIR,
+    MODELS_DIR, SEED,
 )
 from utils import plot_confusion_matrix  # noqa: E402
 
-CONTROL_REPORTS_DIR = os.path.join(HYBRID_REPORTS_DIR, "controle_refit_treino")
 
 META_COLS = ["class", "filename", "split"]
 SVM_MODELS = ["SVM_classicas", "SVM_cnn", "SVM_hibrido"]
@@ -311,7 +311,7 @@ def parse_args():
                       help="controle: treina com os melhores hiperparâmetros já escolhidos, "
                            "só no split de treino (não refaz a grade)")
     mode.add_argument("--replot", action="store_true",
-                      help="só regera reports/hybrid/comparativo.png a partir do comparativo.csv")
+                      help="só regera reports/ia/hibrido/comparativo.png a partir do comparativo.csv")
     return parser.parse_args()
 
 
@@ -403,7 +403,7 @@ def run_main(quick):
 def run_control_train_only():
     """Controle: mesmos hiperparâmetros do protocolo principal, ajuste SÓ no treino.
 
-    Não refaz a grade, não sobrescreve reports/hybrid/ nem models/svm_hybrid.joblib.
+    Não refaz a grade, não sobrescreve reports/ia/hibrido/ nem models/svm_hybrid.joblib.
     """
     class_names, data, hand_cols, cnn_cols, test, cnn_pred = load_test_context()
     train = data[data["split"] == "train"]
@@ -429,7 +429,7 @@ def run_control_train_only():
                             "protocolo": "refit só no treino (controle)",
                             "n_train": int(len(train))}
 
-    write_reports(CONTROL_REPORTS_DIR, y_test, predictions, svm_extras, class_names,
+    write_reports(HYBRID_CONTROL_REPORTS_DIR, y_test, predictions, svm_extras, class_names,
                   subtitle="controle: SVMs ajustados só no treino")
 
 

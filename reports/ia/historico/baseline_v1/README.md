@@ -18,9 +18,9 @@ Arquivos:
 
 | Arquivo | Conteúdo |
 |---|---|
-| `classification_report.txt` | precision/recall/F1 por classe (validação, 3632 imagens) |
-| `training_history.png` | acurácia de treino e validação por época |
-| `resultado_20260919_172330.png` / `.txt` | exemplo da rotina de demonstração |
+| [`classification_report.txt`](classification_report.txt) | precision/recall/F1 por classe (validação, 3632 imagens) |
+| [`training_history.png`](training_history.png) | acurácia de treino e validação por época |
+| [`resultado_20260919_172330.png`](resultado_20260919_172330.png) / [`.txt`](resultado_20260919_172330.txt) | exemplo da rotina de demonstração |
 
 O arquivo do modelo não foi mantido no repositório (não é usado por nenhum script);
 apenas os relatórios desta rodada foram preservados.

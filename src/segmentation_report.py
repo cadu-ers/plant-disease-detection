@@ -12,13 +12,14 @@ Não depende de nada do bloco de IA (features_cache/, models/).
 Uso:
     python src/segmentation_report.py                -> etapas + qualidade + suspeitos
     python src/segmentation_report.py --comparacao   -> máscara antiga x nova em 12 imagens
-    python src/segmentation_report.py --comparacao --s 40 --v 20 --out reports/segmentation/segmentation_S40_V20.png
+    python src/segmentation_report.py --comparacao --s 40 --v 20 --out reports/pi/segmentacao/estudo_limiares/segmentation_S40_V20.png
         -> comparação com outros limites mínimos de S e V da máscara de lesão
     (requer data/ e data_split/split_manifest.csv)
 
-Gera (em reports/segmentation/):
+Gera (em reports/pi/segmentacao/):
     etapas_segmentacao.png        -> original até segmentada, para 2 folhas com lesões grandes
-    qualidade_segmentacao.csv     -> por imagem: fração de folha, fallback, buracos (antiga x nova)
+    qualidade_segmentacao.csv     -> por imagem: fração de folha, proporção de lesão, fallback,
+                                     buracos (antiga x nova)
     qualidade_segmentacao.png     -> fração de folha por classe + buracos antiga x nova
     casos_suspeitos.png           -> as 12 segmentações mais suspeitas
     segmentation_comparison.png   -> (--comparacao) Original | Máscara antiga | Máscara nova |
@@ -39,7 +40,8 @@ import pandas as pd  # noqa: E402
 from joblib import Parallel, delayed  # noqa: E402
 
 from config import (  # noqa: E402
-    DATA_DIR, LOWER_GREEN, LOWER_LESION, MIN_LEAF_AREA_RATIO, SEED, SEGMENTATION_REPORTS_DIR,
+    DATA_DIR, LOWER_GREEN, LOWER_LESION, MIN_LEAF_AREA_RATIO, SEED, SEGMENTATION_QUALITY_PATH,
+    SEGMENTATION_REPORTS_DIR,
     SPLIT_MANIFEST, UPPER_GREEN, UPPER_LESION,
 )
 from preprocessing import (  # noqa: E402
@@ -150,12 +152,25 @@ def figure_steps(examples, path):
 
 
 # ---------- Qualidade em todas as imagens ----------
+def lesion_ratio_from_steps(s):
+    """Fração dos pixels da folha (máscara final) na faixa LOWER_LESION/UPPER_LESION.
+
+    Mesmo cálculo da feature lesion_ratio de features.py, feito aqui direto da
+    máscara para o bloco de PI não depender de features_cache/.
+    """
+    leaf = s["mask"] > 0
+    if not leaf.any():
+        return 0.0
+    return float(((s["lesion"] > 0) & leaf).sum() / leaf.sum())
+
+
 def quality_one(path):
     s = segmentation_steps(path)
     if not np.array_equal(s["filled"], s["mask"]):
         raise AssertionError(f"reimplementação diferente do pipeline em {path}")
     return {
         "leaf_fraction": float((s["mask"] > 0).mean()),
+        "lesion_ratio": lesion_ratio_from_steps(s),
         "fallback": bool(s["fallback"]),
         "holes_old": count_holes(old_green_mask(s["hsv"])),
         "holes_new": count_holes(s["mask"]),
@@ -296,14 +311,8 @@ def run_comparison(s_min, v_min, out_path):
 
 # ---------- Main ----------
 def lesion_ratio_one(path):
-    """Fração dos pixels da folha (máscara final) na faixa LOWER_LESION/UPPER_LESION.
-
-    Mesmo cálculo da feature lesion_ratio de features.py, feito aqui direto da
-    máscara para o bloco de PI não depender de features_cache/.
-    """
-    s = segmentation_steps(path)
-    leaf = s["mask"] > 0
-    return float(((s["lesion"] > 0) & leaf).sum() / leaf.sum())
+    """Proporção de lesão de uma imagem (ver lesion_ratio_from_steps)."""
+    return lesion_ratio_from_steps(segmentation_steps(path))
 
 
 def pick_step_examples(manifest):
@@ -361,7 +370,7 @@ def main():
                           | (quality["leaf_fraction"] > SUSPECT_HIGH))
     print(f"Qualidade calculada em {len(quality)} imagens em {time.time() - t0:.1f} s "
           "(máscara reimplementada idêntica à do pipeline em todas)")
-    csv_path = os.path.join(SEGMENTATION_REPORTS_DIR, "qualidade_segmentacao.csv")
+    csv_path = SEGMENTATION_QUALITY_PATH
     quality.drop(columns="original_path").to_csv(csv_path, index=False)
     print(f"Tabela salva em: {csv_path}")
 

@@ -10,13 +10,13 @@ Utilizamos um subconjunto do dataset, com as classes de **tomate** e
 ## Formato e resolução
 
 Resumo de todas as imagens de `data/`, gerado por `python src/data_overview.py`
-([`reports/dados/resumo_dados.csv`](../reports/dados/resumo_dados.csv)): são
+([`reports/pi/dados/resumo_dados.csv`](../reports/pi/dados/resumo_dados.csv)): são
 18.163 imagens em 13 classes, todas com **256x256 pixels**, em formato **JPEG**
 (lido do cabeçalho do arquivo; as extensões variam entre `.JPG`, `.jpg` e
 `.jpeg`) e modo de cor **RGB**. Um arquivo que não é imagem foi encontrado em
 `data/` e é ignorado pelos scripts.
 
-![Uma imagem por classe](../reports/dados/exemplos_por_classe.png)
+![Uma imagem por classe](../reports/pi/dados/exemplos_por_classe.png)
 
 ## Desbalanceamento
 
@@ -30,7 +30,7 @@ da CNN compensa isso com `class_weight` balanceado e os SVMs com
 
 Divisão estratificada 70/15/15 (seed 42) feita por `python src/split_dataset.py`,
 registrada em `data_split/split_manifest.csv` e resumida em
-[`reports/split_summary.csv`](../reports/split_summary.csv). O conjunto de teste
+[`reports/pi/dados/split_summary.csv`](../reports/pi/dados/split_summary.csv). O conjunto de teste
 é fixo e nunca é usado no treino nem na escolha de hiperparâmetros.
 
 | Classe | Treino | Validação | Teste | Total |

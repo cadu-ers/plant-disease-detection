@@ -8,11 +8,11 @@ Etapas:
     1. download_dataset      (só se data/ não tiver imagens)
     2. preprocessing         -> data_processed/
     3. split_dataset         -> data_split/ + split_manifest.csv
-    4. data_overview         -> reports/dados/
-    5. segmentation_report   -> reports/segmentation/ (etapas, qualidade, suspeitos)
-    6. segmentation_report --comparacao -> reports/segmentation/segmentation_comparison.png
-    7. fft_analysis          -> reports/fft/ + features_cache/fft_features.csv
-    8. histogram_analysis    -> reports/histograma_exemplo.png (material da P1)
+    4. data_overview         -> reports/pi/dados/
+    5. segmentation_report   -> reports/pi/segmentacao/ (etapas, qualidade, suspeitos)
+    6. segmentation_report --comparacao -> reports/pi/segmentacao/segmentation_comparison.png
+    7. fft_analysis          -> reports/pi/fft/ + features_cache/fft_features.csv
+    8. histogram_analysis    -> reports/pi/p1_histograma/ (material da P1)
 Cada etapa é pulada se as suas saídas já existirem ("[pulado] já existe").
 
 Uso:
@@ -23,8 +23,8 @@ Uso:
                                            exige data_processed/ e data_split/
 
 Gera:
-    data/, data_processed/, data_split/, reports/dados/, reports/segmentation/,
-    reports/fft/, reports/histograma_exemplo.png e features_cache/fft_features.csv
+    data/, data_processed/, data_split/, reports/pi/ (dados, segmentacao, fft,
+    p1_histograma) e features_cache/fft_features.csv
 """
 
 import argparse
@@ -33,20 +33,21 @@ import sys
 
 from config import (
     DATA_DIR, DATA_REPORTS_DIR, FFT_FEATURES_PATH, FFT_REPORTS_DIR, IMAGE_EXTENSIONS,
-    PROCESSED_DIR, REPORTS_DIR, SEGMENTATION_REPORTS_DIR, SPLIT_MANIFEST,
+    P1_REPORTS_DIR, PROCESSED_DIR, SEGMENTATION_QUALITY_PATH, SEGMENTATION_REPORTS_DIR,
+    SPLIT_MANIFEST,
 )
 from orchestration import Step, go_to_project_root, run_steps
 
 SEGMENTATION_OUTPUTS = [os.path.join(SEGMENTATION_REPORTS_DIR, f) for f in (
-    "etapas_segmentacao.png", "qualidade_segmentacao.csv", "qualidade_segmentacao.png",
-    "casos_suspeitos.png")]
+    "etapas_segmentacao.png", "qualidade_segmentacao.png", "casos_suspeitos.png")] + [
+    SEGMENTATION_QUALITY_PATH]
 COMPARISON_OUTPUT = os.path.join(SEGMENTATION_REPORTS_DIR, "segmentation_comparison.png")
 DATA_OUTPUTS = [os.path.join(DATA_REPORTS_DIR, f) for f in (
     "exemplos_por_classe.png", "resumo_dados.csv")]
 FFT_OUTPUTS = [os.path.join(FFT_REPORTS_DIR, f) for f in (
     "fft_saudavel_vs_doente.png", "fft_magnitude_vs_fase.png",
     "blur_espaco_vs_frequencia.png", "espectro_radial_por_classe.png")] + [FFT_FEATURES_PATH]
-HISTOGRAM_OUTPUT = os.path.join(REPORTS_DIR, "histograma_exemplo.png")
+HISTOGRAM_OUTPUT = os.path.join(P1_REPORTS_DIR, "histograma_exemplo.png")
 
 
 def has_images(root):

@@ -5,7 +5,7 @@ quantidade, resolução, formato e modo de cor de TODAS as imagens de data/.
 Uso:
     python src/data_overview.py
 
-Gera (em reports/dados/):
+Gera (em reports/pi/dados/):
     exemplos_por_classe.png   -> 1 imagem original por classe (título: classe e nº de imagens)
     resumo_dados.csv          -> classe, nº de imagens, resoluções, extensões, formato real e modo de cor
 """

@@ -2,7 +2,7 @@
 
 # FFT (domínio da frequência)
 
-Implementado em [`src/fft_analysis.py`](../src/fft_analysis.py), com figuras em [`reports/fft/`](../reports/fft/).
+Implementado em [`src/fft_analysis.py`](../src/fft_analysis.py), com figuras em [`reports/pi/fft/`](../reports/pi/fft/).
 
 **Preparação de cada imagem**:
 1. Tom de cinza da imagem original 224x224, antes do blur, porque o blur
@@ -66,12 +66,14 @@ IA (`features_cache/handcrafted.csv`); se esse arquivo não existir, o
 
 ## Figuras
 
-![Folha saudável x doente na frequência](../reports/fft/fft_saudavel_vs_doente.png)
+![Folha saudável x doente na frequência](../reports/pi/fft/fft_saudavel_vs_doente.png)
 
-![Magnitude x fase](../reports/fft/fft_magnitude_vs_fase.png)
+![Magnitude x fase](../reports/pi/fft/fft_magnitude_vs_fase.png)
 
-![Teorema da convolução](../reports/fft/blur_espaco_vs_frequencia.png)
+![Teorema da convolução](../reports/pi/fft/blur_espaco_vs_frequencia.png)
 
-![Espectro radial por classe](../reports/fft/espectro_radial_por_classe.png)
+![Espectro radial por classe](../reports/pi/fft/espectro_radial_por_classe.png)
 
-![SVM com descritores FFT](../reports/fft/fft_svm.png)
+![SVM com descritores FFT](../reports/pi/fft/fft_svm.png)
+
+A demonstração ao vivo destas etapas, em uma imagem, é feita com `python src/demo_pi.py` (ver [Como reproduzir](07_como_reproduzir.md#demonstração-do-processamento-de-imagens-demo_pipy)).

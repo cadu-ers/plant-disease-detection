@@ -56,6 +56,7 @@ sistema especialista (regras SE... ENTÃO) roda à parte, com fatos em JSON.
 pip install -r requirements.txt
 python src/run_pi.py          # bloco de Processamento de Imagens
 python src/run_ia.py          # bloco de IA (treina a CNN só se não houver modelo)
+python src/demo_pi.py         # demonstração do Processamento de Imagens
 python src/demo.py            # demonstração em uma imagem
 ```
 
@@ -69,11 +70,14 @@ Opções dos orquestradores, execução manual script por script, Docker e teste
 | Orquestração | `run_pi.py`, `run_ia.py`, `run_all.py`, `orchestration.py` |
 | Processamento de Imagens | `download_dataset.py`, `preprocessing.py`, `split_dataset.py`, `data_overview.py`, `segmentation_report.py`, `fft_analysis.py`, `features.py`, `histogram_analysis.py` (P1) |
 | Inteligência Artificial | `model_utils.py`, `train_model.py`, `extract_features.py`, `hybrid_classifier.py`, `expert_system/` |
-| Demo | `demo.py` |
+| Demo | `demo_pi.py` (Processamento de Imagens), `demo.py` |
 | Comuns e testes | `config.py`, `utils.py`, `tests/` |
 
-Saídas: `reports/` (figuras e métricas), `models/` (modelos), `data_processed/`
-e `data_split/` (imagens segmentadas e divisão), `features_cache/` (features).
+Saídas: `reports/pi/` e `reports/ia/` (figuras e métricas de cada bloco, com
+índices em [reports/pi/LEIAME.md](reports/pi/LEIAME.md) e
+[reports/ia/LEIAME.md](reports/ia/LEIAME.md)), `models/` (modelos),
+`data_processed/` e `data_split/` (imagens segmentadas e divisão),
+`features_cache/` (features).
 Árvore completa em [docs/07_como_reproduzir.md](docs/07_como_reproduzir.md#estrutura-do-repositório).
 
 ## Documentação técnica

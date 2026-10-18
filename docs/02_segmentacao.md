@@ -32,7 +32,7 @@ processamento de imagens segue as etapas abaixo (1 a 4 em
      sintoma da doença era justamente o que estava sendo apagado. A
      comparação entre as duas abordagens pode ser gerada com
      `python src/segmentation_report.py --comparacao` (salva em
-     [`reports/segmentation/segmentation_comparison.png`](../reports/segmentation/segmentation_comparison.png)).
+     [`reports/pi/segmentacao/segmentation_comparison.png`](../reports/pi/segmentacao/segmentation_comparison.png)).
    - **Escolha dos limiares da máscara de lesão**: o matiz (H ~8–35) foi
      fixado e testamos os mínimos de saturação (S) e brilho (V) nas mesmas
      12 imagens (seed 42), com
@@ -40,10 +40,10 @@ processamento de imagens segue as etapas abaixo (1 a 4 em
 
      | S | V | Lesões na borda | Vazamento de fundo | Imagem |
      |---|---|---|---|---|
-     | 40 | 30 | Lesões escuras da borda cortadas | Não | [`reports/segmentation/segmentation_S40_V30.png`](../reports/segmentation/segmentation_S40_V30.png) |
-     | 25 | 20 | Recuperadas | Sim: o fundo bege/cinza tem matiz na faixa do marrom, e só a saturação separa os dois | [`reports/segmentation/segmentation_S25_V20.png`](../reports/segmentation/segmentation_S25_V20.png) |
-     | **40** | **20** | **Recuperadas (escolhido)** | **Não** | [`reports/segmentation/segmentation_comparison.png`](../reports/segmentation/segmentation_comparison.png) |
-     | 35 | 20 | Recuperadas | Sombra/fundo começam a entrar | [`reports/segmentation/segmentation_S35_V20.png`](../reports/segmentation/segmentation_S35_V20.png) |
+     | 40 | 30 | Lesões escuras da borda cortadas | Não | [`reports/pi/segmentacao/estudo_limiares/segmentation_S40_V30.png`](../reports/pi/segmentacao/estudo_limiares/segmentation_S40_V30.png) |
+     | 25 | 20 | Recuperadas | Sim: o fundo bege/cinza tem matiz na faixa do marrom, e só a saturação separa os dois | [`reports/pi/segmentacao/estudo_limiares/segmentation_S25_V20.png`](../reports/pi/segmentacao/estudo_limiares/segmentation_S25_V20.png) |
+     | **40** | **20** | **Recuperadas (escolhido)** | **Não** | [`reports/pi/segmentacao/segmentation_comparison.png`](../reports/pi/segmentacao/segmentation_comparison.png) |
+     | 35 | 20 | Recuperadas | Sombra/fundo começam a entrar | [`reports/pi/segmentacao/estudo_limiares/segmentation_S35_V20.png`](../reports/pi/segmentacao/estudo_limiares/segmentation_S35_V20.png) |
 
    - **Limitação conhecida**: lesões de borda com saturação tão baixa
      quanto a do fundo (ex.: o recorte em uma das imagens de
@@ -51,7 +51,7 @@ processamento de imagens segue as etapas abaixo (1 a 4 em
      Uma melhoria futura seria segmentar a folha com GrabCut ou com um
      modelo de segmentação (ex.: U-Net).
    - **Verificação objetiva** (`python src/segmentation_report.py`, em
-     todas as 18.163 imagens; resultados em [`reports/segmentation/`](../reports/segmentation/)):
+     todas as 18.163 imagens; resultados em [`reports/pi/segmentacao/`](../reports/pi/segmentacao/)):
      - As etapas da segmentação estão em `etapas_segmentacao.png`. O
        script confere que a máscara final reimplementada para a figura é
        idêntica à do `segment_leaf` em todas as imagens.
@@ -87,23 +87,25 @@ processamento de imagens segue as etapas abaixo (1 a 4 em
 
 Etapas da segmentação (`python src/segmentation_report.py`):
 
-![Etapas da segmentação](../reports/segmentation/etapas_segmentacao.png)
+![Etapas da segmentação](../reports/pi/segmentacao/etapas_segmentacao.png)
 
 Máscara antiga x nova (`python src/segmentation_report.py --comparacao`):
 
-![Comparação máscara antiga x nova](../reports/segmentation/segmentation_comparison.png)
+![Comparação máscara antiga x nova](../reports/pi/segmentacao/segmentation_comparison.png)
 
 Verificação objetiva em todas as imagens:
 
-![Qualidade da segmentação](../reports/segmentation/qualidade_segmentacao.png)
+![Qualidade da segmentação](../reports/pi/segmentacao/qualidade_segmentacao.png)
 
-![Casos suspeitos](../reports/segmentation/casos_suspeitos.png)
+![Casos suspeitos](../reports/pi/segmentacao/casos_suspeitos.png)
 
 ## Histograma de intensidade (material da P1)
 
 O script `src/histogram_analysis.py` gera
-[`reports/histograma_exemplo.png`](../reports/histograma_exemplo.png), que
+[`reports/pi/p1_histograma/histograma_exemplo.png`](../reports/pi/p1_histograma/histograma_exemplo.png), que
 compara o histograma de intensidade de uma imagem antes e depois de uma
 normalização min-max. É material da P1, mantido só como registro: essa
 normalização **não faz parte do pipeline final** (as etapas do
 `preprocessing.py` são as 1 a 4 acima, sem normalização de intensidade).
+
+A demonstração ao vivo destas etapas, em uma imagem, é feita com `python src/demo_pi.py` (ver [Como reproduzir](07_como_reproduzir.md#demonstração-do-processamento-de-imagens-demo_pipy)).

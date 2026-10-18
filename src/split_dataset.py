@@ -13,7 +13,7 @@ Uso:
 Gera:
     data_split/{train,val,test}/<NomeDaClasse>/*.jpg   -> cópias das imagens segmentadas
     data_split/split_manifest.csv                     -> class, filename, split, processed_path, original_path
-    reports/split_summary.csv                         -> contagem por classe x split
+    reports/pi/dados/split_summary.csv                -> contagem por classe x split
 """
 
 import os
@@ -23,12 +23,11 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 
 from config import (
-    DATA_DIR, PROCESSED_DIR, REPORTS_DIR, SEED, SPLIT_DIR, SPLIT_MANIFEST, SPLIT_RATIOS,
+    DATA_DIR, PROCESSED_DIR, SEED, SPLIT_DIR, SPLIT_MANIFEST, SPLIT_RATIOS, SPLIT_SUMMARY_PATH,
 )
 from utils import list_classes, list_images
 
 SPLITS = ("train", "val", "test")
-SUMMARY_PATH = os.path.join(REPORTS_DIR, "split_summary.csv")
 
 
 def as_posix(*parts):
@@ -83,8 +82,8 @@ def save_summary(df):
     summary = pd.crosstab(df["class"], df["split"])[list(SPLITS)]
     summary["total"] = summary.sum(axis=1)
     summary.loc["TOTAL"] = summary.sum()
-    os.makedirs(REPORTS_DIR, exist_ok=True)
-    summary.to_csv(SUMMARY_PATH)
+    os.makedirs(os.path.dirname(SPLIT_SUMMARY_PATH), exist_ok=True)
+    summary.to_csv(SPLIT_SUMMARY_PATH)
     return summary
 
 
@@ -112,7 +111,7 @@ def main():
     print()
     print(summary.to_string())
     print(f"\nManifest salvo em: {SPLIT_MANIFEST}")
-    print(f"Resumo salvo em: {SUMMARY_PATH}")
+    print(f"Resumo salvo em: {SPLIT_SUMMARY_PATH}")
 
 
 if __name__ == "__main__":

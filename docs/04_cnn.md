@@ -43,7 +43,7 @@ Etapas do treino:
    folhas. As camadas **BatchNormalization continuam congeladas**: se
    fossem destravadas, passariam a atualizar suas estatísticas com os
    batches do treino, o que desestabilizou o modelo no início do
-   fine-tuning na rodada anterior ([`reports/cnn_run1/`](../reports/cnn_run1/)).
+   fine-tuning na rodada anterior ([`reports/ia/historico/cnn_run1/`](../reports/ia/historico/cnn_run1/)).
 6. **Early stopping e ReduceLROnPlateau**: em cada etapa, o treino é
    interrompido quando a `val_loss` (loss de validação) para de melhorar
    por 4 épocas, e o learning rate é multiplicado por 0.3 sempre que ela
@@ -78,7 +78,7 @@ para a redução do learning rate).
   desestabilizou o modelo porque as camadas BatchNormalization destravadas
   passaram a atualizar suas estatísticas: na primeira época do fine-tuning a
   loss de treino saltou de 0.53 para 1.40 (pico visível em
-  [`reports/cnn_run1/training_history.png`](../reports/cnn_run1/training_history.png)).
+  [`reports/ia/historico/cnn_run1/training_history.png`](../reports/ia/historico/cnn_run1/training_history.png)).
 - **Rodada 2**: BatchNormalization congelado no fine-tuning, 50 camadas
   destravadas, learning rate 1e-4 com ReduceLROnPlateau e até 20 épocas de
   fine-tuning. Na prática, a etapa 1 rodou 10 épocas (melhor: 7) e o
@@ -88,12 +88,12 @@ Os recalls de `Tomato_Early_blight` e `Tomato__Target_Spot` continuam os mais
 baixos entre essas classes: as duas doenças produzem manchas parecidas.
 
 O relatório completo (precision/recall/F1 por classe), a matriz de confusão,
-as métricas e o histórico de treino da CNN estão em [`reports/cnn/`](../reports/cnn/); os
-resultados do classificador híbrido estão em [`reports/hybrid/`](../reports/hybrid/) (ver
+as métricas e o histórico de treino da CNN estão em [`reports/ia/cnn/`](../reports/ia/cnn/); os
+resultados do classificador híbrido estão em [`reports/ia/hibrido/`](../reports/ia/hibrido/) (ver
 [Resultados do classificador híbrido](05_classificador_hibrido.md#resultados-do-classificador-híbrido)).
 
 ## Figuras
 
-![Histórico de treino da CNN](../reports/cnn/training_history.png)
+![Histórico de treino da CNN](../reports/ia/cnn/training_history.png)
 
-![Matriz de confusão da CNN no teste](../reports/cnn/confusion_matrix.png)
+![Matriz de confusão da CNN no teste](../reports/ia/cnn/confusion_matrix.png)

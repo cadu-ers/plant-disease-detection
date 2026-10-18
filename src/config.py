@@ -18,12 +18,24 @@ DATA_DIR = "data"                    # dataset original: data/<NomeDaClasse>/*.j
 PROCESSED_DIR = "data_processed"     # imagens segmentadas (entrada da CNN)
 SPLIT_DIR = "data_split"             # divisão treino/validação/teste
 MODELS_DIR = "models"                # modelos treinados
-REPORTS_DIR = "reports"              # gráficos e relatórios
-SEGMENTATION_REPORTS_DIR = os.path.join(REPORTS_DIR, "segmentation")  # comparações de segmentação
-CNN_REPORTS_DIR = os.path.join(REPORTS_DIR, "cnn")                    # saídas do train_model.py
-HYBRID_REPORTS_DIR = os.path.join(REPORTS_DIR, "hybrid")              # saídas do hybrid_classifier.py
-FFT_REPORTS_DIR = os.path.join(REPORTS_DIR, "fft")                    # saídas do fft_analysis.py
-DATA_REPORTS_DIR = os.path.join(REPORTS_DIR, "dados")                 # saídas do data_overview.py
+REPORTS_DIR = "reports"              # gráficos e relatórios, separados por bloco
+
+# reports/pi/: bloco de Processamento de Imagens
+PI_REPORTS_DIR = os.path.join(REPORTS_DIR, "pi")
+DATA_REPORTS_DIR = os.path.join(PI_REPORTS_DIR, "dados")                 # data_overview.py, split_dataset.py
+SPLIT_SUMMARY_PATH = os.path.join(DATA_REPORTS_DIR, "split_summary.csv")
+SEGMENTATION_REPORTS_DIR = os.path.join(PI_REPORTS_DIR, "segmentacao")   # segmentation_report.py
+SEGMENTATION_QUALITY_PATH = os.path.join(SEGMENTATION_REPORTS_DIR, "qualidade_segmentacao.csv")
+THRESHOLD_STUDY_DIR = os.path.join(SEGMENTATION_REPORTS_DIR, "estudo_limiares")  # comparações --s/--v
+FFT_REPORTS_DIR = os.path.join(PI_REPORTS_DIR, "fft")                    # fft_analysis.py
+P1_REPORTS_DIR = os.path.join(PI_REPORTS_DIR, "p1_histograma")           # histogram_analysis.py (P1)
+
+# reports/ia/: bloco de Inteligência Artificial
+IA_REPORTS_DIR = os.path.join(REPORTS_DIR, "ia")
+CNN_REPORTS_DIR = os.path.join(IA_REPORTS_DIR, "cnn")                    # train_model.py
+HYBRID_REPORTS_DIR = os.path.join(IA_REPORTS_DIR, "hibrido")             # hybrid_classifier.py
+HYBRID_CONTROL_REPORTS_DIR = os.path.join(HYBRID_REPORTS_DIR, "controle_refit_treino")
+HISTORY_REPORTS_DIR = os.path.join(IA_REPORTS_DIR, "historico")          # rodadas antigas (registro)
 DEMO_DIR = "rotina_demo"             # saídas da rotina de demonstração
 FEATURES_DIR = "features_cache"      # features extraídas (handcrafted + embeddings da CNN)
 

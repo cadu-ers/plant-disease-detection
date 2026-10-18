@@ -69,7 +69,7 @@ Decisões de projeto:
   significativa). É aplicado entre `CNN` e `SVM_hibrido` e entre `SVM_cnn` e
   `SVM_hibrido`.
 
-Saídas em [`reports/hybrid/`](../reports/hybrid/): métricas e relatório por classe de cada modelo,
+Saídas em [`reports/ia/hibrido/`](../reports/ia/hibrido/): métricas e relatório por classe de cada modelo,
 resultados do grid search, matriz de confusão do `SVM_hibrido`,
 `comparativo.csv`/`comparativo.png` e `mcnemar.txt`. O melhor pipeline
 híbrido fica em `models/svm_hybrid.joblib`.
@@ -147,8 +147,8 @@ com o treino):
 | SVM_cnn | 10 | scale | 256 | 0.968 |
 | SVM_hibrido | 10 | scale | 128 | 0.973 |
 
-Gráficos: [`reports/hybrid/comparativo.png`](../reports/hybrid/comparativo.png) (protocolo principal) e
-[`reports/hybrid/controle_refit_treino/comparativo.png`](../reports/hybrid/controle_refit_treino/comparativo.png) (controle), cada um com
+Gráficos: [`reports/ia/hibrido/comparativo.png`](../reports/ia/hibrido/comparativo.png) (protocolo principal) e
+[`reports/ia/hibrido/controle_refit_treino/comparativo.png`](../reports/ia/hibrido/controle_refit_treino/comparativo.png) (controle), cada um com
 um painel em escala completa e um painel com zoom (eixo começando em 0.85),
 onde as diferenças entre os modelos ficam visíveis.
 
@@ -160,8 +160,8 @@ imagens de campo é necessário antes de qualquer uso prático.
 
 ## Figuras
 
-![Comparativo no protocolo principal](../reports/hybrid/comparativo.png)
+![Comparativo no protocolo principal](../reports/ia/hibrido/comparativo.png)
 
-![Comparativo no controle](../reports/hybrid/controle_refit_treino/comparativo.png)
+![Comparativo no controle](../reports/ia/hibrido/controle_refit_treino/comparativo.png)
 
-![Matriz de confusão do SVM híbrido](../reports/hybrid/confusion_matrix_SVM_hibrido.png)
+![Matriz de confusão do SVM híbrido](../reports/ia/hibrido/confusion_matrix_SVM_hibrido.png)

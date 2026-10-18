@@ -12,7 +12,7 @@ Uso:
     python src/histogram_analysis.py caminho/da/imagem.jpg -> imagem específica
 
 Gera:
-    reports/histograma_exemplo.png
+    reports/pi/p1_histograma/histograma_exemplo.png
 """
 
 import os
@@ -21,10 +21,10 @@ import sys
 import cv2
 import matplotlib.pyplot as plt
 
-from config import DATA_DIR, REPORTS_DIR
+from config import DATA_DIR, P1_REPORTS_DIR
 from utils import pick_random_image
 
-OUTPUT_PATH = os.path.join(REPORTS_DIR, "histograma_exemplo.png")
+OUTPUT_PATH = os.path.join(P1_REPORTS_DIR, "histograma_exemplo.png")
 
 
 def compute_histogram(img_gray):

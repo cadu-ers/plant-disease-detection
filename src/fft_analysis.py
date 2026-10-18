@@ -18,12 +18,12 @@ Preparação de cada imagem (prepare_image):
 
 Uso:
     python src/fft_analysis.py
-    (requer data/, data_split/split_manifest.csv e reports/segmentation/qualidade_segmentacao.csv,
+    (requer data/, data_split/split_manifest.csv e reports/pi/segmentacao/qualidade_segmentacao.csv,
      gerado por segmentation_report.py; todas as figuras são geradas sem nada do bloco de IA.
      Só a comparação com SVM usa features_cache/handcrafted.csv, do bloco de IA: se o
      arquivo não existir, ela é pulada com um aviso)
 
-Gera (em reports/fft/):
+Gera (em reports/pi/fft/):
     fft_saudavel_vs_doente.png       -> imagem, magnitude, fase, passa-baixa e passa-alta
     fft_magnitude_vs_fase.png        -> reconstrução só com magnitude x só com fase
     blur_espaco_vs_frequencia.png    -> teorema da convolução com o blur do pipeline
@@ -51,7 +51,7 @@ from sklearn.svm import SVC  # noqa: E402
 
 from config import (  # noqa: E402
     FEATURES_DIR, FFT_FEATURES_PATH, FFT_REPORTS_DIR, HANDCRAFTED_PATH, SEED, SEG_IMG_SIZE,
-    SEGMENTATION_REPORTS_DIR, SPLIT_MANIFEST,
+    SEGMENTATION_QUALITY_PATH, SPLIT_MANIFEST,
 )
 from preprocessing import segment_image  # noqa: E402
 from utils import short_name, slide_style  # noqa: E402
@@ -169,7 +169,7 @@ def normalize01(img):
 def pick_median_leaf_examples(train):
     """Exemplos da figura (a): em cada classe, a imagem de treino com fração de folha
     mais próxima da mediana da classe (evita folhas mal segmentadas); seed 42 desempata."""
-    quality = pd.read_csv(os.path.join(SEGMENTATION_REPORTS_DIR, "qualidade_segmentacao.csv"))
+    quality = pd.read_csv(SEGMENTATION_QUALITY_PATH)
     rng = random.Random(SEED)
     examples = []
     for c in EXAMPLE_CLASSES:

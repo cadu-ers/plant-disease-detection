@@ -10,8 +10,8 @@ Etapas:
                               ou com --treinar (leva ~1h30 em CPU)
     2. extract_features    -> features_cache/ (pulado se já estiver completo e a
                               CNN não tiver sido treinada de novo)
-    3. hybrid_classifier   -> reports/hybrid/ + models/svm_hybrid.joblib
-    4. hybrid_controle     -> reports/hybrid/controle_refit_treino/ (SVMs só no treino)
+    3. hybrid_classifier   -> reports/ia/hibrido/ + models/svm_hybrid.joblib
+    4. hybrid_controle     -> reports/ia/hibrido/controle_refit_treino/ (SVMs só no treino)
 Etapas 2 a 4 são puladas se as saídas já existirem (exceto com --force ou se
 uma etapa anterior tiver rodado de novo).
 
@@ -23,8 +23,8 @@ Uso:
     python src/run_ia.py --sem-hibrido   -> para depois da CNN
 
 Gera:
-    models/plant_disease_model.keras, models/class_names.json, reports/cnn/,
-    features_cache/ (handcrafted, embeddings, softmax), reports/hybrid/ e
+    models/plant_disease_model.keras, models/class_names.json, reports/ia/cnn/,
+    features_cache/ (handcrafted, embeddings, softmax), reports/ia/hibrido/ e
     models/svm_hybrid.joblib
 """
 
@@ -34,13 +34,14 @@ import sys
 
 from config import (
     CNN_EMBEDDINGS_PATH, CNN_TEST_PRED_PATH, HANDCRAFTED_PATH, HYBRID_MODEL_PATH,
-    HYBRID_REPORTS_DIR, IMAGE_EXTENSIONS, MODEL_PATH, PROCESSED_DIR, SPLIT_MANIFEST,
+    HYBRID_CONTROL_REPORTS_DIR, HYBRID_REPORTS_DIR, IMAGE_EXTENSIONS, MODEL_PATH, PROCESSED_DIR,
+    SPLIT_MANIFEST,
 )
 from orchestration import Step, go_to_project_root, run_steps
 
 FEATURE_OUTPUTS = [HANDCRAFTED_PATH, CNN_EMBEDDINGS_PATH, CNN_TEST_PRED_PATH]
 HYBRID_OUTPUTS = [os.path.join(HYBRID_REPORTS_DIR, "comparativo.csv"), HYBRID_MODEL_PATH]
-CONTROL_OUTPUTS = [os.path.join(HYBRID_REPORTS_DIR, "controle_refit_treino", "comparativo.csv")]
+CONTROL_OUTPUTS = [os.path.join(HYBRID_CONTROL_REPORTS_DIR, "comparativo.csv")]
 
 
 def pi_outputs_exist():

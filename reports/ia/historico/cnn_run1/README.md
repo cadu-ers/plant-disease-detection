@@ -18,9 +18,9 @@ EarlyStopping em `val_loss`, paciência 3, restaurando os melhores pesos.
 - Acurácia: **0.815**
 - F1-macro: **0.796**
 
-Detalhes em `classification_report.txt`, `confusion_matrix.png` e `metrics_cnn.json`.
+Detalhes em [`classification_report.txt`](classification_report.txt), [`confusion_matrix.png`](confusion_matrix.png) e [`metrics_cnn.json`](metrics_cnn.json).
 
-## Diagnóstico (ver `training_history.png`)
+## Diagnóstico (ver [`training_history.png`](training_history.png))
 
 1. **Salto na entrada do fine-tuning**: na 1ª época da etapa 2, a loss de treino
    subiu de 0.53 para 1.40 e a acurácia de treino caiu de 0.81 para 0.65. As
