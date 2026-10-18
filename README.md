@@ -212,6 +212,57 @@ híbrido fica em `models/svm_hybrid.joblib`.
 
 Resultados: (preencher após rodar)
 
+## Sistema especialista
+
+O projeto também possui um sistema especialista em `src/expert_system/`.
+Ele recebe fatos sobre a planta e aplica regras do tipo **SE... ENTÃO...**
+para ranquear doenças, calcular fatores de certeza e explicar o resultado.
+
+A base de conhecimento está em `src/expert_system/knowledge_base.yaml` e
+contém os sintomas, as 13 doenças, as regras, os fatores de certeza e as
+recomendações gerais. O motor também pode receber probabilidades produzidas
+pela CNN por meio do campo `cnn_prior`.
+
+### Executar um diagnóstico de exemplo
+
+Na raiz do projeto, execute:
+
+```bash
+python src/expert_system/diagnose.py src/expert_system/exemplos/late_blight_tomate.json
+```
+
+Para executar sem utilizar a evidência da CNN:
+
+```bash
+python src/expert_system/diagnose.py src/expert_system/exemplos/late_blight_tomate.json --sem-cnn
+```
+
+Para utilizar o modo interativo:
+
+```bash
+python src/expert_system/diagnose.py src/expert_system/exemplos/ambiguo_early_target.json --interativo
+```
+
+O resultado apresenta a hipótese principal, as evidências das regras, as
+hipóteses alternativas, os sintomas pendentes e recomendações gerais. O
+valor exibido como **CF** é um fator de certeza do sistema, não uma
+probabilidade estatística calibrada.
+
+Atualmente, o sistema especialista pode ser executado de forma independente
+com fatos informados em JSON. A integração automática entre imagem,
+segmentação, extração de medidas, CNN e sistema especialista é uma etapa
+futura do projeto.
+
+### Executar os testes
+
+```bash
+python -m pytest -q
+```
+
+Os testes cobrem o carregamento da base de conhecimento, o mapeamento das
+classes, o cálculo dos fatores de certeza, as regras de diagnóstico, as
+explicações e o modo interativo.
+
 ## Requisitos
 
 As dependências do projeto estão listadas em [`requirements.txt`](./requirements.txt).
@@ -243,8 +294,7 @@ Utilizamos um subconjunto do dataset, com as classes de **tomate** e
 ├── models/
 │   ├── plant_disease_model.keras  # modelo atual (gerado por train_model.py, não versionado)
 │   ├── class_names.json    # ordem das classes usada no treino
-│   ├── svm_hybrid.joblib   # melhor pipeline do classificador híbrido (hybrid_classifier.py)
-│   └── baseline_v1/        # modelo antigo, antes das correções (não versionado)
+│   └── svm_hybrid.joblib   # melhor pipeline do classificador híbrido (gerado por hybrid_classifier.py)
 ├── reports/
 │   ├── baseline_v1/        # relatórios do modelo antigo + README explicando o que mudou
 │   ├── cnn/                # saídas do train_model.py (relatório, matriz de confusão, métricas, histórico)
@@ -262,10 +312,12 @@ Utilizamos um subconjunto do dataset, com as classes de **tomate** e
 │   ├── extract_features.py # extrai features clássicas + embeddings da CNN -> features_cache/
 │   ├── hybrid_classifier.py  # SVMs (clássicas / CNN / híbrido) x CNN no teste + McNemar
 │   ├── check_segmentation.py  # compara a máscara antiga e a nova (reports/segmentation/)
-│   ├── model_utils.py      # arquitetura do modelo (augmentation + MobileNetV2 + cabeça)
+│   ├── model_utils.py      # arquitetura do modelo usada no treino (augmentation + MobileNetV2 + cabeça)
 │   ├── train_model.py      # treino do modelo de IA
 │   ├── demo.py             # rotina de demonstração (predição em uma imagem)
-│   └── histogram_analysis.py  # script de documentação (histograma antes/depois da normalização)
+│   ├── histogram_analysis.py  # script de documentação (histograma antes/depois da normalização)
+│   ├── expert_system/      # sistema especialista: base de conhecimento (YAML), motor de inferência e diagnose.py
+│   └── tests/              # testes automatizados do sistema especialista (pytest)
 ├── requirements.txt
 └── README.md
 ```
@@ -286,6 +338,16 @@ python src/demo.py
 Para um teste rápido do classificador híbrido (poucas imagens e grade
 reduzida): `python src/extract_features.py --limit 5` seguido de
 `python src/hybrid_classifier.py --quick`.
+
+Sistema especialista (independente do pipeline acima; detalhes na seção
+[Sistema especialista](#sistema-especialista)) e testes:
+
+```bash
+python src/expert_system/diagnose.py src/expert_system/exemplos/late_blight_tomate.json
+python src/expert_system/diagnose.py src/expert_system/exemplos/late_blight_tomate.json --sem-cnn
+python src/expert_system/diagnose.py src/expert_system/exemplos/ambiguo_early_target.json --interativo
+python -m pytest -q
+```
 
 ## Docker
 
