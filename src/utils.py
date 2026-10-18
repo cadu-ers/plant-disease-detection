@@ -4,7 +4,7 @@ confusão no padrão do projeto.
 
 Uso:
     from utils import list_classes, list_images, pick_random_image
-    from utils import short_name, plot_confusion_matrix
+    from utils import short_name, plot_confusion_matrix, slide_style
 
 Gera:
     nada (módulo de funções auxiliares)
@@ -89,3 +89,19 @@ def plot_confusion_matrix(y_true, y_pred, class_names, path,
     plt.savefig(path, dpi=120)
     plt.close(fig)
     print(f"Matriz de confusão salva em: {path}")
+
+
+def slide_style():
+    """Estilo dos gráficos de apresentação: fontes >= 12 e dpi 150 ao salvar."""
+    import matplotlib.pyplot as plt
+    plt.rcParams.update({
+        "font.size": 12,
+        "axes.titlesize": 13,
+        "axes.labelsize": 12,
+        "xtick.labelsize": 12,
+        "ytick.labelsize": 12,
+        "legend.fontsize": 12,
+        "figure.titlesize": 15,
+        "savefig.dpi": 150,
+        "savefig.bbox": "tight",
+    })

@@ -28,10 +28,21 @@ Decisões de projeto:
       olhando só os casos em que eles discordam (um acerta e o outro erra). Se as
       diferenças fossem acaso, esses casos se dividiriam 50/50; o teste binomial exato
       dá o p-valor (p < 0.05 = diferença significativa).
+    - Controle "refit só no treino" (--control-train-only): no protocolo principal, o
+      refit final dos SVMs usa treino+validação (15.438 imagens), enquanto a CNN
+      aprendeu seus pesos só no treino (12.714; a validação serviu apenas para o
+      early stopping). A comparação CNN x SVMs misturaria, então, o efeito da fusão
+      com o efeito de ~21% a mais de dados. O controle reusa os melhores
+      hiperparâmetros já escolhidos (lidos de metrics_<modelo>.json, sem refazer a
+      grade), ajusta os 3 SVMs SÓ no treino e repete a avaliação no teste. Se a
+      vantagem dos SVMs sobre a CNN se mantiver, ela vem da fusão/classificador e não
+      dos dados extras.
 
 Uso:
-    python src/hybrid_classifier.py           -> grade completa
-    python src/hybrid_classifier.py --quick   -> grade reduzida (teste rápido)
+    python src/hybrid_classifier.py                       -> grade completa (protocolo principal)
+    python src/hybrid_classifier.py --quick               -> grade reduzida (teste rápido)
+    python src/hybrid_classifier.py --control-train-only  -> controle: SVMs ajustados só no treino
+    python src/hybrid_classifier.py --replot              -> só regera o comparativo.png principal
     (requer features_cache/ gerado por src/extract_features.py)
 
 Gera (em reports/hybrid/):
@@ -41,6 +52,9 @@ Gera (em reports/hybrid/):
     comparativo.csv, comparativo.png
     mcnemar.txt
 e models/svm_hybrid.joblib (melhor pipeline híbrido).
+O controle gera metrics_<modelo>.json, classification_report_<modelo>.txt,
+comparativo.csv, comparativo.png e mcnemar.txt em reports/hybrid/controle_refit_treino/,
+sem tocar nos arquivos principais nem no modelo salvo.
 """
 
 import argparse
@@ -70,6 +84,8 @@ from config import (  # noqa: E402
     HANDCRAFTED_PATH, HYBRID_MODEL_PATH, HYBRID_REPORTS_DIR, MODELS_DIR, SEED,
 )
 from utils import plot_confusion_matrix  # noqa: E402
+
+CONTROL_REPORTS_DIR = os.path.join(HYBRID_REPORTS_DIR, "controle_refit_treino")
 
 META_COLS = ["class", "filename", "split"]
 SVM_MODELS = ["SVM_classicas", "SVM_cnn", "SVM_hibrido"]
@@ -168,15 +184,15 @@ def to_jsonable(value):
     return value
 
 
-def save_model_reports(name, y_true, y_pred, class_names, extra):
+def save_model_reports(name, y_true, y_pred, class_names, extra, out_dir):
     metrics = compute_metrics(y_true, y_pred)
     metrics.update({"n_test": int(len(y_true))}, **extra)
-    with open(os.path.join(HYBRID_REPORTS_DIR, f"metrics_{name}.json"), "w", encoding="utf-8") as f:
+    with open(os.path.join(out_dir, f"metrics_{name}.json"), "w", encoding="utf-8") as f:
         json.dump(to_jsonable(metrics), f, indent=2)
 
     report = classification_report(y_true, y_pred, labels=class_names,
                                    target_names=class_names, zero_division=0)
-    with open(os.path.join(HYBRID_REPORTS_DIR, f"classification_report_{name}.txt"), "w",
+    with open(os.path.join(out_dir, f"classification_report_{name}.txt"), "w",
               encoding="utf-8") as f:
         f.write(report)
     print(f"  {name}: accuracy {metrics['accuracy']:.4f} | F1-macro {metrics['f1_macro']:.4f}")
@@ -192,37 +208,60 @@ def cnn_train_time():
         return json.load(f).get("train_time_seconds")
 
 
-def plot_comparison(comparison, path):
+def _draw_bars(ax, comparison, ylim, label_offset):
     """Barras agrupadas (accuracy e F1-macro) por modelo, com os valores escritos."""
     models = comparison.index.tolist()
     x = np.arange(len(models))
     width = 0.36
     gap = 0.02  # pequeno espaço entre as duas barras de cada grupo
 
-    fig, ax = plt.subplots(figsize=(10, 5.5))
     for offset, metric, label, color in [
         (-(width + gap) / 2, "accuracy", "Accuracy", COLOR_ACCURACY),
         ((width + gap) / 2, "f1_macro", "F1-macro", COLOR_F1),
     ]:
-        values = comparison[metric].to_numpy()
+        values = comparison[metric].to_numpy(dtype=float)
         bars = ax.bar(x + offset, values, width, label=label, color=color, zorder=2)
         for bar, v in zip(bars, values):
-            ax.text(bar.get_x() + bar.get_width() / 2, v + 0.01, f"{v:.3f}",
+            ax.text(bar.get_x() + bar.get_width() / 2, v + label_offset, f"{v:.3f}",
                     ha="center", va="bottom", fontsize=9, color=INK_PRIMARY)
 
     ax.set_xticks(x)
     ax.set_xticklabels(models, color=INK_PRIMARY)
-    ax.set_ylim(0, 1.08)
-    ax.set_ylabel("Valor no conjunto de teste", color=INK_SECONDARY)
-    ax.set_title("CNN x SVMs: accuracy e F1-macro no teste", color=INK_PRIMARY)
+    ax.set_ylim(*ylim)
     ax.yaxis.grid(True, color=GRID_COLOR, linewidth=0.8, zorder=0)
     ax.tick_params(colors=INK_SECONDARY)
     for side in ("top", "right"):
         ax.spines[side].set_visible(False)
     for side in ("left", "bottom"):
         ax.spines[side].set_color(GRID_COLOR)
-    ax.legend(frameon=False, loc="upper left", ncol=2)
 
+
+def plot_comparison(comparison, path, subtitle=""):
+    """Dois painéis: escala completa (eixo em 0) e zoom em [0.85, 1.0].
+
+    No painel completo as diferenças entre os modelos (poucos pontos percentuais)
+    ficam invisíveis; o zoom mostra essas diferenças, e o título deixa explícito
+    que o eixo não começa em 0. Se algum valor ficar abaixo de 0.85, o limite
+    inferior do zoom desce o necessário para a barra aparecer.
+    """
+    zoom_low = 0.85
+    lowest = comparison[["accuracy", "f1_macro"]].to_numpy(dtype=float).min()
+    if lowest < zoom_low + 0.01:
+        zoom_low = np.floor((lowest - 0.02) * 20) / 20
+
+    fig, (ax_full, ax_zoom) = plt.subplots(1, 2, figsize=(15, 5.5))
+    _draw_bars(ax_full, comparison, (0, 1.08), 0.01)
+    ax_full.set_title("escala completa", color=INK_PRIMARY)
+    ax_full.set_ylabel("Valor no conjunto de teste", color=INK_SECONDARY)
+    ax_full.legend(frameon=False, loc="upper left", ncol=2)
+
+    _draw_bars(ax_zoom, comparison, (zoom_low, 1.0), 0.002)
+    ax_zoom.set_title("zoom (eixo não começa em 0)", color=INK_PRIMARY)
+
+    title = "CNN x SVMs: accuracy e F1-macro no teste"
+    if subtitle:
+        title += f" ({subtitle})"
+    fig.suptitle(title, color=INK_PRIMARY)
     plt.tight_layout()
     plt.savefig(path, dpi=120)
     plt.close(fig)
@@ -265,56 +304,90 @@ def mcnemar(y_true, pred_a, pred_b, name_a, name_b):
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--quick", action="store_true",
-                        help="grade reduzida (C=10, gamma=scale, PCA=128) para teste rápido")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--quick", action="store_true",
+                      help="grade reduzida (C=10, gamma=scale, PCA=128) para teste rápido")
+    mode.add_argument("--control-train-only", action="store_true",
+                      help="controle: treina com os melhores hiperparâmetros já escolhidos, "
+                           "só no split de treino (não refaz a grade)")
+    mode.add_argument("--replot", action="store_true",
+                      help="só regera reports/hybrid/comparativo.png a partir do comparativo.csv")
     return parser.parse_args()
 
 
-def main():
-    args = parse_args()
-    grid = QUICK_GRID if args.quick else FULL_GRID
-    os.makedirs(HYBRID_REPORTS_DIR, exist_ok=True)
-    os.makedirs(MODELS_DIR, exist_ok=True)
-
+def load_test_context():
+    """Classes, dados, linhas de teste e a predição da CNN no teste."""
     with open(CLASS_NAMES_PATH, encoding="utf-8") as f:
         class_names = json.load(f)
 
     data, hand_cols, cnn_cols = load_features()
     test = data[data["split"] == "test"]
-    y_test = test["class"].to_numpy()
     print(f"Amostras: {data['split'].value_counts().to_dict()} | "
-          f"{len(hand_cols)} features clássicas + {len(cnn_cols)} dims de embedding"
-          + (" | grade reduzida (--quick)" if args.quick else ""))
-
-    predictions, metrics_all = {}, {}
+          f"{len(hand_cols)} features clássicas + {len(cnn_cols)} dims de embedding")
 
     # CNN (referência): softmax salvo pelo extract_features.py, na ordem das linhas de teste
     cnn_probs = np.load(CNN_TEST_PRED_PATH)
     if len(cnn_probs) != len(test):
         raise ValueError("cnn_test_pred.npy não bate com as linhas de teste. Rode extract_features.py.")
-    predictions["CNN"] = np.array(class_names)[cnn_probs.argmax(axis=1)]
+    cnn_pred = np.array(class_names)[cnn_probs.argmax(axis=1)]
+    return class_names, data, hand_cols, cnn_cols, test, cnn_pred
 
-    # SVMs
-    searches = {}
+
+def write_reports(out_dir, y_test, predictions, svm_extras, class_names, subtitle=""):
+    """Métricas e relatório por modelo, comparativo (csv + png) e McNemar em out_dir."""
+    os.makedirs(out_dir, exist_ok=True)
+    print("\nAvaliação no TESTE:")
+    metrics_all = {"CNN": save_model_reports(
+        "CNN", y_test, predictions["CNN"], class_names,
+        {"train_time_seconds": cnn_train_time(), "best_params": None}, out_dir)}
+    for name in SVM_MODELS:
+        metrics_all[name] = save_model_reports(
+            name, y_test, predictions[name], class_names, svm_extras[name], out_dir)
+
+    metric_keys = ["accuracy", "f1_macro", "f1_weighted", "precision_macro", "recall_macro",
+                   "train_time_seconds"]
+    comparison = pd.DataFrame(
+        [[metrics_all[m][k] for k in metric_keys] for m in ALL_MODELS],
+        index=pd.Index(ALL_MODELS, name="modelo"), columns=metric_keys, dtype=float)
+    comparison.to_csv(os.path.join(out_dir, "comparativo.csv"))
+    print("\n" + comparison[["accuracy", "f1_macro", "f1_weighted"]].round(4).to_string())
+    plot_comparison(comparison, os.path.join(out_dir, "comparativo.png"), subtitle)
+
+    text = "Teste de McNemar exato no conjunto de TESTE (n = %d)" % len(y_test)
+    text += (f" — {subtitle}" if subtitle else "") + "\n\n"
+    text += mcnemar(y_test, predictions["CNN"], predictions["SVM_hibrido"], "CNN", "SVM_hibrido")
+    text += "\n" + mcnemar(y_test, predictions["SVM_cnn"], predictions["SVM_hibrido"],
+                           "SVM_cnn", "SVM_hibrido")
+    mcnemar_path = os.path.join(out_dir, "mcnemar.txt")
+    with open(mcnemar_path, "w", encoding="utf-8") as f:
+        f.write(text)
+    print("\n" + text)
+    print(f"McNemar salvo em: {mcnemar_path}")
+
+
+def run_main(quick):
+    """Protocolo principal: grade na validação, refit em treino+validação."""
+    grid = QUICK_GRID if quick else FULL_GRID
+    os.makedirs(MODELS_DIR, exist_ok=True)
+    class_names, data, hand_cols, cnn_cols, test, cnn_pred = load_test_context()
+    if quick:
+        print("Grade reduzida (--quick)")
+    y_test = test["class"].to_numpy()
+    predictions, svm_extras, searches = {"CNN": cnn_pred}, {}, {}
+
+    os.makedirs(HYBRID_REPORTS_DIR, exist_ok=True)
     for name in SVM_MODELS:
         print(f"\nTreinando {name}...")
         search, train_time = fit_svm(name, data, hand_cols, cnn_cols, grid)
-        searches[name] = (search, train_time)
+        searches[name] = search
         pd.DataFrame(search.cv_results_).to_csv(
             os.path.join(HYBRID_REPORTS_DIR, f"grid_search_{name}.csv"), index=False)
         predictions[name] = search.predict(test[hand_cols + cnn_cols])
+        svm_extras[name] = {"train_time_seconds": round(train_time, 1),
+                            "best_params": search.best_params_,
+                            "best_val_f1_macro": search.best_score_}
 
-    print("\nAvaliação no TESTE:")
-    metrics_all["CNN"] = save_model_reports(
-        "CNN", y_test, predictions["CNN"], class_names,
-        {"train_time_seconds": cnn_train_time(), "best_params": None})
-    for name in SVM_MODELS:
-        search, train_time = searches[name]
-        metrics_all[name] = save_model_reports(
-            name, y_test, predictions[name], class_names,
-            {"train_time_seconds": round(train_time, 1),
-             "best_params": search.best_params_,
-             "best_val_f1_macro": search.best_score_})
+    write_reports(HYBRID_REPORTS_DIR, y_test, predictions, svm_extras, class_names)
 
     # Matriz de confusão do híbrido (índices na ordem de class_names)
     index = {c: i for i, c in enumerate(class_names)}
@@ -323,29 +396,58 @@ def main():
         os.path.join(HYBRID_REPORTS_DIR, "confusion_matrix_SVM_hibrido.png"),
         title="Matriz de confusão SVM_hibrido (teste, normalizada por linha)")
 
-    # Comparativo
-    metric_keys = ["accuracy", "f1_macro", "f1_weighted", "precision_macro", "recall_macro",
-                   "train_time_seconds"]
-    comparison = pd.DataFrame(
-        [[metrics_all[m][k] for k in metric_keys] for m in ALL_MODELS],
-        index=pd.Index(ALL_MODELS, name="modelo"), columns=metric_keys, dtype=float)
-    comparison.to_csv(os.path.join(HYBRID_REPORTS_DIR, "comparativo.csv"))
-    print("\n" + comparison[["accuracy", "f1_macro", "f1_weighted"]].round(4).to_string())
+    joblib.dump(searches["SVM_hibrido"].best_estimator_, HYBRID_MODEL_PATH)
+    print(f"Melhor pipeline híbrido salvo em: {HYBRID_MODEL_PATH}")
+
+
+def run_control_train_only():
+    """Controle: mesmos hiperparâmetros do protocolo principal, ajuste SÓ no treino.
+
+    Não refaz a grade, não sobrescreve reports/hybrid/ nem models/svm_hybrid.joblib.
+    """
+    class_names, data, hand_cols, cnn_cols, test, cnn_pred = load_test_context()
+    train = data[data["split"] == "train"]
+    y_test = test["class"].to_numpy()
+    predictions, svm_extras = {"CNN": cnn_pred}, {}
+
+    for name in SVM_MODELS:
+        metrics_path = os.path.join(HYBRID_REPORTS_DIR, f"metrics_{name}.json")
+        if not os.path.exists(metrics_path):
+            raise SystemExit(f"{metrics_path} não encontrado: rode o protocolo principal primeiro.")
+        with open(metrics_path, encoding="utf-8") as f:
+            best_params = json.load(f)["best_params"]
+
+        print(f"\nTreinando {name} só no treino ({len(train)} imagens) com {best_params}...")
+        pipe = make_pipeline(name, hand_cols, cnn_cols).set_params(**best_params)
+        t0 = time.time()
+        pipe.fit(train[hand_cols + cnn_cols], train["class"])
+        train_time = time.time() - t0
+        print(f"  {train_time:.1f} s")
+        predictions[name] = pipe.predict(test[hand_cols + cnn_cols])
+        svm_extras[name] = {"train_time_seconds": round(train_time, 1),
+                            "best_params": best_params,
+                            "protocolo": "refit só no treino (controle)",
+                            "n_train": int(len(train))}
+
+    write_reports(CONTROL_REPORTS_DIR, y_test, predictions, svm_extras, class_names,
+                  subtitle="controle: SVMs ajustados só no treino")
+
+
+def replot_main():
+    """Regera o gráfico principal a partir do comparativo.csv, sem retreinar."""
+    comparison = pd.read_csv(os.path.join(HYBRID_REPORTS_DIR, "comparativo.csv"),
+                             index_col="modelo")
     plot_comparison(comparison, os.path.join(HYBRID_REPORTS_DIR, "comparativo.png"))
 
-    # McNemar
-    text = "Teste de McNemar exato no conjunto de TESTE (n = %d)\n\n" % len(y_test)
-    text += mcnemar(y_test, predictions["CNN"], predictions["SVM_hibrido"], "CNN", "SVM_hibrido")
-    text += "\n" + mcnemar(y_test, predictions["SVM_cnn"], predictions["SVM_hibrido"],
-                           "SVM_cnn", "SVM_hibrido")
-    mcnemar_path = os.path.join(HYBRID_REPORTS_DIR, "mcnemar.txt")
-    with open(mcnemar_path, "w", encoding="utf-8") as f:
-        f.write(text)
-    print("\n" + text)
-    print(f"McNemar salvo em: {mcnemar_path}")
 
-    joblib.dump(searches["SVM_hibrido"][0].best_estimator_, HYBRID_MODEL_PATH)
-    print(f"Melhor pipeline híbrido salvo em: {HYBRID_MODEL_PATH}")
+def main():
+    args = parse_args()
+    if args.replot:
+        replot_main()
+    elif args.control_train_only:
+        run_control_train_only()
+    else:
+        run_main(args.quick)
 
 
 if __name__ == "__main__":

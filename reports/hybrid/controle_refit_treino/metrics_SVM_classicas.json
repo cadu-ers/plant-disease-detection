@@ -1,0 +1,15 @@
+{
+  "accuracy": 0.9405504587155963,
+  "f1_macro": 0.9152915874132739,
+  "f1_weighted": 0.9401083679292003,
+  "precision_macro": 0.9342848370844705,
+  "recall_macro": 0.9050617288667338,
+  "n_test": 2725,
+  "train_time_seconds": 2.8,
+  "best_params": {
+    "svm__C": 100,
+    "svm__gamma": 0.01
+  },
+  "protocolo": "refit s\u00f3 no treino (controle)",
+  "n_train": 12714
+}

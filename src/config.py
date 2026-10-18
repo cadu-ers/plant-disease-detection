@@ -22,6 +22,8 @@ REPORTS_DIR = "reports"              # gráficos e relatórios
 SEGMENTATION_REPORTS_DIR = os.path.join(REPORTS_DIR, "segmentation")  # comparações de segmentação
 CNN_REPORTS_DIR = os.path.join(REPORTS_DIR, "cnn")                    # saídas do train_model.py
 HYBRID_REPORTS_DIR = os.path.join(REPORTS_DIR, "hybrid")              # saídas do hybrid_classifier.py
+FFT_REPORTS_DIR = os.path.join(REPORTS_DIR, "fft")                    # saídas do fft_analysis.py
+DATA_REPORTS_DIR = os.path.join(REPORTS_DIR, "dados")                 # saídas do data_overview.py
 DEMO_DIR = "rotina_demo"             # saídas da rotina de demonstração
 FEATURES_DIR = "features_cache"      # features extraídas (handcrafted + embeddings da CNN)
 
@@ -35,6 +37,8 @@ HYBRID_MODEL_PATH = os.path.join(MODELS_DIR, "svm_hybrid.joblib")
 HANDCRAFTED_PATH = os.path.join(FEATURES_DIR, "handcrafted.csv")
 CNN_EMBEDDINGS_PATH = os.path.join(FEATURES_DIR, "cnn_embeddings.npz")
 CNN_TEST_PRED_PATH = os.path.join(FEATURES_DIR, "cnn_test_pred.npy")
+# Gerado por fft_analysis.py (descritores de textura no domínio da frequência)
+FFT_FEATURES_PATH = os.path.join(FEATURES_DIR, "fft_features.csv")
 
 # ---------- Divisão treino/validação/teste ----------
 # Proporções (treino, validação, teste), estratificadas por classe.

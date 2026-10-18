@@ -1,0 +1,16 @@
+{
+  "accuracy": 0.9761467889908257,
+  "f1_macro": 0.9713352916263236,
+  "f1_weighted": 0.9760592698191595,
+  "precision_macro": 0.9758925778263055,
+  "recall_macro": 0.9674125606050742,
+  "n_test": 2725,
+  "train_time_seconds": 2.3,
+  "best_params": {
+    "features__cnn__pca__n_components": 128,
+    "svm__C": 10,
+    "svm__gamma": "scale"
+  },
+  "protocolo": "refit s\u00f3 no treino (controle)",
+  "n_train": 12714
+}

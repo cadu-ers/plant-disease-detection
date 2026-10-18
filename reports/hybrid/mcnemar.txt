@@ -1,0 +1,19 @@
+Teste de McNemar exato no conjunto de TESTE (n = 2725)
+
+=== CNN x SVM_hibrido ===
+                        SVM_hibrido correto    SVM_hibrido errado
+CNN correto                            2571                    15
+CNN errado                               96                    43
+
+Casos discordantes: 111 (só CNN acerta: 15; só SVM_hibrido acerta: 96)
+p-valor (binomial exato, bicaudal): 1.236e-15
+p < 0.05: a diferença é estatisticamente significativa; SVM_hibrido acerta mais nos casos em que os dois discordam.
+
+=== SVM_cnn x SVM_hibrido ===
+                        SVM_hibrido correto    SVM_hibrido errado
+SVM_cnn correto                        2623                     8
+SVM_cnn errado                           44                    50
+
+Casos discordantes: 52 (só SVM_cnn acerta: 8; só SVM_hibrido acerta: 44)
+p-valor (binomial exato, bicaudal): 4.039e-07
+p < 0.05: a diferença é estatisticamente significativa; SVM_hibrido acerta mais nos casos em que os dois discordam.

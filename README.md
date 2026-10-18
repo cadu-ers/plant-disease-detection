@@ -62,11 +62,97 @@ processamento de imagens segue as etapas abaixo (1 a 4 em
      `Potato___Early_blight`) não são separáveis apenas por limiar de HSV.
      Uma melhoria futura seria segmentar a folha com GrabCut ou com um
      modelo de segmentação (ex.: U-Net).
+   - **Verificação objetiva** (`python src/segmentation_report.py`, em
+     todas as 18.163 imagens; resultados em `reports/segmentation/`):
+     - As etapas da segmentação estão em `etapas_segmentacao.png`. O
+       script confere que a máscara final reimplementada para a figura é
+       idêntica à do `segment_leaf` em todas as imagens.
+     - **Buracos**: a máscara antiga (só verde) teria buracos internos em
+       10.604 imagens (média de 2,15 por imagem), em geral nas lesões. Na
+       máscara nova, só 2 imagens têm algum buraco.
+     - **Fração da imagem ocupada pela folha**: mediana de 0,42. O
+       fallback (maior contorno < 5% da imagem) foi acionado em 5 imagens.
+     - **Casos suspeitos**: 100 imagens (0,6%), sendo 49 com folha < 10% da
+       imagem e 51 com folha > 95%. As 12 mais suspeitas estão em
+       `casos_suspeitos.png`. Inspecionando os casos, há dois tipos de
+       falha real:
+       - **Fundo que vaza** (folha > 95%): fundos bege/rosados com
+         saturação ≥ 40 passam na faixa de lesão, e o contorno preenchido
+         engole a imagem inteira. Concentrado em
+         `Tomato__Tomato_YellowLeaf__Curl_Virus` (32) e
+         `Tomato_Spider_mites_Two_spotted_spider_mite` (11).
+       - **Folhas esbranquiçadas** (pouca saturação): a máscara verde se
+         fragmenta e só um pedaço da folha é mantido. É a causa de 4 dos 5
+         fallbacks.
+       - Nem todo caso com folha < 10% é falha: numa amostra de 8, cerca de
+         metade eram folhas realmente pequenas na foto, segmentadas
+         corretamente.
+     - Os dois tipos de falha reforçam a melhoria futura citada acima
+       (GrabCut ou U-Net).
 5. **Extração de features clássicas** (complementar, em `src/features.py`):
    147 descritores de cor, proporção de lesão e textura (GLCM e LBP),
    calculados só nos pixels da folha (máscara da segmentação). Essa etapa
    foi separada do `preprocessing.py` (que só segmenta) e é usada pelo
    classificador híbrido (ver seção "Classificador híbrido" abaixo).
+
+## FFT (domínio da frequência)
+
+Implementado em `src/fft_analysis.py`, com figuras em `reports/fft/`.
+
+**Preparação de cada imagem**:
+1. Tom de cinza da imagem original 224x224, antes do blur, porque o blur
+   apagaria as altas frequências.
+2. Fundo preenchido com a média de cinza da folha. O degrau entre a folha
+   e o fundo preto criaria um "+" enorme no espectro.
+3. Subtração da média, para o termo DC não dominar as baixas frequências.
+4. Janela de Hann 2D, que reduz o vazamento espectral causado pelas bordas
+   da imagem.
+5. `np.fft.fft2` + `fftshift`.
+
+**Baixas x altas frequências**: o centro do espectro (baixas frequências)
+representa a forma geral da folha e as variações lentas de tom, como manchas
+grandes. A periferia (altas frequências) representa bordas, nervuras e
+textura fina. Em `fft_saudavel_vs_doente.png`, o passa-baixa gaussiano
+(D0 = 15) deixa só a silhueta e as manchas grandes, e o passa-alta realça
+bordas, nervuras e o contorno das lesões. No espectro radial por classe
+(`espectro_radial_por_classe.png`), as duas classes **saudáveis** têm a
+maior razão de energia alta/baixa frequência, e
+`Tomato__Tomato_YellowLeaf__Curl_Virus` a menor. A energia em alta
+frequência vem principalmente da textura fina e nítida da folha; as lesões
+são manchas de tamanho médio e não aumentam essa razão.
+
+**Magnitude x fase** (`fft_magnitude_vs_fase.png`): a reconstrução só com a
+fase mantém a estrutura da folha (posição das bordas e das lesões). A
+reconstrução só com a magnitude perde a estrutura: a magnitude diz "quanto"
+de cada frequência existe, mas não onde.
+
+**Teorema da convolução com o blur do pipeline**
+(`blur_espaco_vs_frequencia.png`): aplicar o `GaussianBlur` 5x5 do
+`preprocessing.py` no espaço, com borda circular, dá o mesmo resultado que
+multiplicar a FFT da imagem pela FFT do kernel (com zero-padding para
+224x224). O erro máximo absoluto é de 8,5e-14 níveis de cinza, ou seja,
+erro de arredondamento. A FFT do kernel mostra que o blur é um filtro
+passa-baixa.
+
+**FFT como descritor de textura**: para todas as imagens, 11 descritores do
+espectro de potência (energia normalizada em 8 faixas radiais espaçadas em
+log, razão alta/baixa, centroide espectral e entropia espectral), em
+`features_cache/fft_features.csv`. SVM (RBF, C = 10, `class_weight`
+balanceado), treinado só no treino e avaliado no teste:
+
+| Features | Nº | Acurácia | F1-macro |
+|---|---|---|---|
+| Só FFT | 11 | 0.380 | 0.330 |
+| Só clássicas | 147 | 0.937 | 0.915 |
+| Clássicas + FFT | 158 | 0.939 | 0.920 |
+
+Sozinha, a FFT radial discrimina mal as 13 classes: ela resume a textura
+em poucos números e não tem informação de cor. Somada às features
+clássicas, o ganho é **pequeno** (+0.002 de acurácia, cerca de 5 imagens de
+2.725, e +0.006 de F1-macro), então não a incorporamos ao classificador
+híbrido. O resultado "só clássicas" difere um pouco do `SVM_classicas` do
+classificador híbrido porque aqui os hiperparâmetros são fixos (C = 10),
+sem a busca na validação.
 
 ## Descrição detalhada da integração com IA — Pipeline completo
 
@@ -119,20 +205,46 @@ Etapas do treino:
    modelo fica com os pesos da época de menor `val_loss`, mesmo que a
    etapa chegue ao limite de épocas sem o early stopping disparar.
 
-### Resultados
+### Resultados da CNN
 
-> Resultados abaixo são do modelo baseline (reports/baseline_v1/); serão atualizados com o modelo corrigido.
+Métricas no **conjunto de teste**: 2.725 imagens que nunca foram usadas no
+treino nem na seleção de modelo (a validação serve só para o early stopping e
+para a redução do learning rate).
 
-O modelo atingiu **89% de acurácia** no conjunto de validação. Classes
-com sintomas visuais bem distintos (ex: `Tomato_YellowLeaf_Curl_Virus`,
-`Potato_Early_blight`) obtiveram F1-score acima de 0.92. Já classes com
-sintomas visualmente semelhantes entre si (ex: `Tomato_Early_blight` e
-`Tomato__Target_Spot`) apresentaram mais confusão, com recall mais baixo
-(0.58 e 0.75, respectivamente) — um comportamento esperado dado que essas
-doenças compartilham padrões de manchas parecidos.
+**Evolução do modelo**
 
-O gráfico de acurácia por época e o relatório completo de métricas
-(precision/recall/F1 por classe) estão disponíveis em `reports/`.
+| | Baseline v1 | Rodada 1 | Rodada 2 (atual) |
+|---|---|---|---|
+| Medido em | validação (3.632 imagens) | teste (2.725 imagens) | teste (2.725 imagens) |
+| Acurácia | 0.88 | 0.815 | **0.949** |
+| F1-macro | 0.86 | 0.796 | **0.950** |
+| Recall `Tomato_Early_blight` | 0.59 | 0.51 | **0.86** |
+| Recall `Tomato__Target_Spot` | 0.73 | 0.64 | **0.88** |
+| Recall `Tomato_Late_blight` | 0.87 | 0.62 | **0.92** |
+
+- **Baseline v1**: segmentação antiga (máscara só de verde, que apagava as
+  lesões), divisão 80/20 sem conjunto de teste e métrica medida na própria
+  validação usada no early stopping, por isso otimista e não comparável
+  diretamente com as rodadas seguintes. O relatório do baseline só tem duas
+  casas decimais.
+- **Rodada 1**: segmentação corrigida, divisão 70/15/15 com teste separado,
+  data augmentation e class weight balanceado. O fine-tuning, porém,
+  desestabilizou o modelo porque as camadas BatchNormalization destravadas
+  passaram a atualizar suas estatísticas: na primeira época do fine-tuning a
+  loss de treino saltou de 0.53 para 1.40 (pico visível em
+  `reports/cnn_run1/training_history.png`).
+- **Rodada 2**: BatchNormalization congelado no fine-tuning, 50 camadas
+  destravadas, learning rate 1e-4 com ReduceLROnPlateau e até 20 épocas de
+  fine-tuning. Na prática, a etapa 1 rodou 10 épocas (melhor: 7) e o
+  fine-tuning 18 épocas (melhor: 14), com o learning rate reduzido até 2.7e-6.
+
+Os recalls de `Tomato_Early_blight` e `Tomato__Target_Spot` continuam os mais
+baixos entre essas classes: as duas doenças produzem manchas parecidas.
+
+O relatório completo (precision/recall/F1 por classe), a matriz de confusão,
+as métricas e o histórico de treino da CNN estão em `reports/cnn/`; os
+resultados do classificador híbrido estão em `reports/hybrid/` (ver
+[Resultados do classificador híbrido](#resultados-do-classificador-híbrido)).
 
 ## Classificador híbrido (CNN + features clássicas + SVM)
 
@@ -210,7 +322,87 @@ híbrido fica em `models/svm_hybrid.joblib`.
 
 ### Resultados do classificador híbrido
 
-Resultados: (preencher após rodar)
+Todos os modelos são avaliados no mesmo conjunto de teste (2.725 imagens).
+
+**Protocolo principal** (hiperparâmetros escolhidos na validação; SVMs
+reajustados em treino + validação, 15.438 imagens):
+
+| Modelo | Acurácia | F1-macro | F1-weighted |
+|---|---|---|---|
+| CNN | 0.949 | 0.950 | 0.949 |
+| SVM_classicas | 0.946 | 0.922 | 0.946 |
+| SVM_cnn | 0.966 | 0.960 | 0.965 |
+| **SVM_hibrido** | **0.979** | **0.972** | **0.979** |
+
+**Controle: SVMs ajustados só no treino.** No protocolo principal, os SVMs
+usam ~21% a mais de dados que a CNN (15.438 contra 12.714 imagens; a CNN só
+usou a validação para o early stopping). Para separar o efeito da fusão do
+efeito desses dados extras, o controle (`python src/hybrid_classifier.py
+--control-train-only`) reusa os mesmos hiperparâmetros e treina os SVMs só nas
+12.714 imagens de treino:
+
+| Modelo | Acurácia | F1-macro | F1-weighted |
+|---|---|---|---|
+| CNN | 0.949 | 0.950 | 0.949 |
+| SVM_classicas | 0.941 | 0.915 | 0.940 |
+| SVM_cnn | 0.965 | 0.960 | 0.965 |
+| **SVM_hibrido** | **0.976** | **0.971** | **0.976** |
+
+**Teste de McNemar** (casos em que só um dos dois modelos acerta):
+
+| Protocolo | Par (A x B) | Casos discordantes | Só A acerta | Só B acerta | p-valor |
+|---|---|---|---|---|---|
+| Principal | CNN x SVM_hibrido | 111 | 15 | 96 | 1.2e-15 |
+| Principal | SVM_cnn x SVM_hibrido | 52 | 8 | 44 | 4.0e-07 |
+| Controle | CNN x SVM_hibrido | 102 | 14 | 88 | 2.8e-14 |
+| Controle | SVM_cnn x SVM_hibrido | 43 | 6 | 37 | 1.6e-06 |
+
+Em todos os pares o `SVM_hibrido` acerta mais nos casos discordantes, com
+p < 0,05.
+
+**Interpretação** (com base no controle, em que todos os modelos aprendem só
+com o treino):
+
+- **Ganho das features clássicas** (`SVM_cnn` x `SVM_hibrido`: mesmos
+  embeddings, mesmo protocolo, só muda a presença das features clássicas): o
+  F1-macro sobe de 0.960 para 0.971 e a acurácia de 0.965 para 0.976. Nos 43
+  casos em que os dois discordam, o híbrido acerta 37 (p = 1.6e-06). As
+  features clássicas trazem informação que os embeddings sozinhos não têm.
+- **CNN x SVM_hibrido**: a vantagem se mantém no controle. A acurácia do
+  híbrido cai só de 0.979 para 0.976 sem os dados de validação, e continua
+  acima da CNN (0.949), com 88 contra 14 casos discordantes (p = 2.8e-14).
+  Portanto, a vantagem não vem dos ~21% de dados extras. Parte dela vem de
+  trocar a cabeça softmax da CNN por um SVM sobre os mesmos embeddings
+  (`SVM_cnn` já fica em 0.965 de acurácia, contra 0.949 da CNN; esse par não
+  passou por McNemar), e o restante das features clássicas (item anterior).
+- **Por que as clássicas sozinhas têm F1-macro menor** (0.922 contra 0.946 de
+  acurácia no protocolo principal): o F1-macro dá o mesmo peso a todas as
+  classes, e `Potato___healthy` tem só 106 imagens de treino (23 no teste).
+  Nessa classe, o `SVM_classicas` tem recall de 0.52 (F1 0.67); sem ela, o
+  F1-macro das outras 12 classes seria cerca de 0.94. No híbrido, os embeddings da CNN
+  recuperam boa parte dessa classe: recall de 0.87 no protocolo principal e
+  0.91 no controle (F1 0.93 e 0.95). Ainda fica abaixo da CNN, que acerta as 23
+  imagens (recall 1.00). Com só 23 imagens, cada imagem equivale a ~0.04 de
+  recall.
+
+**Melhores hiperparâmetros** (escolhidos pelo F1-macro na validação):
+
+| Modelo | C | gamma | Componentes da PCA | F1-macro na validação |
+|---|---|---|---|---|
+| SVM_classicas | 100 | 0.01 | — | 0.924 |
+| SVM_cnn | 10 | scale | 256 | 0.968 |
+| SVM_hibrido | 10 | scale | 128 | 0.973 |
+
+Gráficos: `reports/hybrid/comparativo.png` (protocolo principal) e
+`reports/hybrid/controle_refit_treino/comparativo.png` (controle), cada um com
+um painel em escala completa e um painel com zoom (eixo começando em 0.85),
+onde as diferenças entre os modelos ficam visíveis.
+
+**Limitação**: o PlantVillage é formado por fotos de laboratório (fundo
+uniforme, uma folha isolada, iluminação controlada). Os resultados de todos os
+modelos, CNN e SVMs, podem não se manter em fotos de campo, com fundo
+complexo, várias folhas e iluminação variável (*domain shift*). Validar em
+imagens de campo é necessário antes de qualquer uso prático.
 
 ## Sistema especialista
 
@@ -297,9 +489,11 @@ Utilizamos um subconjunto do dataset, com as classes de **tomate** e
 │   └── svm_hybrid.joblib   # melhor pipeline do classificador híbrido (gerado por hybrid_classifier.py)
 ├── reports/
 │   ├── baseline_v1/        # relatórios do modelo antigo + README explicando o que mudou
+│   ├── dados/              # exemplos por classe e resumo do dataset (data_overview.py)
+│   ├── fft/                # análise no domínio da frequência (fft_analysis.py)
 │   ├── cnn/                # saídas do train_model.py (relatório, matriz de confusão, métricas, histórico)
 │   ├── hybrid/             # saídas do hybrid_classifier.py (métricas, comparativo, McNemar)
-│   ├── segmentation/       # comparações de segmentação (check_segmentation.py)
+│   ├── segmentation/       # comparações, etapas e verificação objetiva da segmentação
 │   ├── split_summary.csv   # contagem de imagens por classe x split
 │   └── histograma_exemplo.png  # saída do histogram_analysis.py
 ├── src/
@@ -312,6 +506,9 @@ Utilizamos um subconjunto do dataset, com as classes de **tomate** e
 │   ├── extract_features.py # extrai features clássicas + embeddings da CNN -> features_cache/
 │   ├── hybrid_classifier.py  # SVMs (clássicas / CNN / híbrido) x CNN no teste + McNemar
 │   ├── check_segmentation.py  # compara a máscara antiga e a nova (reports/segmentation/)
+│   ├── segmentation_report.py # etapas da segmentação + verificação objetiva (reports/segmentation/)
+│   ├── fft_analysis.py     # FFT: espectros, magnitude x fase, teorema da convolução, descritores
+│   ├── data_overview.py    # exemplos por classe e resumo de resolução/formato (reports/dados/)
 │   ├── model_utils.py      # arquitetura do modelo usada no treino (augmentation + MobileNetV2 + cabeça)
 │   ├── train_model.py      # treino do modelo de IA
 │   ├── demo.py             # rotina de demonstração (predição em uma imagem)
@@ -333,6 +530,15 @@ python src/train_model.py
 python src/extract_features.py
 python src/hybrid_classifier.py
 python src/demo.py
+```
+
+Material de processamento de imagens (figuras para a apresentação; usam o
+manifest do split e, no caso da FFT, também `features_cache/handcrafted.csv`):
+
+```bash
+python src/data_overview.py
+python src/segmentation_report.py
+python src/fft_analysis.py
 ```
 
 Para um teste rápido do classificador híbrido (poucas imagens e grade

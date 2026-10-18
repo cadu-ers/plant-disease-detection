@@ -1,0 +1,15 @@
+{
+  "accuracy": 0.9787155963302753,
+  "f1_macro": 0.9717771876664331,
+  "f1_weighted": 0.9785820702941416,
+  "precision_macro": 0.97780518353645,
+  "recall_macro": 0.9668736839518262,
+  "n_test": 2725,
+  "train_time_seconds": 391.7,
+  "best_params": {
+    "features__cnn__pca__n_components": 128,
+    "svm__C": 10,
+    "svm__gamma": "scale"
+  },
+  "best_val_f1_macro": 0.9733408688925813
+}
