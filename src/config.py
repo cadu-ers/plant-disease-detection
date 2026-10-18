@@ -47,9 +47,12 @@ SEED = 42
 
 # ---------- Treino da CNN ----------
 BATCH_SIZE = 32
-INITIAL_EPOCHS = 8       # etapa 1: só a cabeça de classificação
-FINE_TUNE_EPOCHS = 5     # etapa 2: fine-tuning
-FINE_TUNE_LAYERS = 30    # últimas camadas da MobileNetV2 descongeladas no fine-tuning
+INITIAL_EPOCHS = 10      # etapa 1: só a cabeça de classificação
+FINE_TUNE_EPOCHS = 20    # etapa 2: fine-tuning (máximo; o EarlyStopping pode parar antes)
+FINE_TUNE_LAYERS = 50    # últimas camadas da MobileNetV2 descongeladas no fine-tuning
+                         # (as BatchNormalization dentro delas continuam congeladas)
+HEAD_LR = 1e-3           # learning rate da etapa 1
+FINE_TUNE_LR = 1e-4      # learning rate inicial da etapa 2 (ReduceLROnPlateau reduz)
 
 # ---------- Segmentação (limiares em HSV do OpenCV: H 0–179, S e V 0–255) ----------
 # Faixa de verde, usada para separar a folha do fundo.

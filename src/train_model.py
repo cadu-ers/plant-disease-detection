@@ -7,7 +7,9 @@ Pipeline de IA:
         -> data augmentation (só no treino) + MobileNetV2 pré-treinada (ImageNet)
         -> etapa 1: treina só a cabeça de classificação (base congelada)
         -> etapa 2: fine-tuning das últimas FINE_TUNE_LAYERS camadas da base
-        -> class_weight balanceado nas duas etapas; EarlyStopping pela validação
+           (BatchNormalization sempre congeladas)
+        -> class_weight balanceado nas duas etapas; EarlyStopping + ReduceLROnPlateau
+           pela val_loss; cada etapa termina com os pesos da época de menor val_loss
         -> avaliação final no TESTE (nunca usado no treino nem na seleção de modelo)
 
 Uso:
@@ -21,6 +23,7 @@ Gera:
     reports/cnn/classification_report.txt
     reports/cnn/confusion_matrix.png
     reports/cnn/metrics_cnn.json
+    reports/cnn/history.json        -> métricas por época das duas etapas (com learning rate)
 """
 
 import json
@@ -38,8 +41,9 @@ from sklearn.metrics import (
 from sklearn.utils.class_weight import compute_class_weight
 
 from config import (
-    BATCH_SIZE, CLASS_NAMES_PATH, FINE_TUNE_EPOCHS, FINE_TUNE_LAYERS, INITIAL_EPOCHS,
-    CNN_REPORTS_DIR, MODEL_IMG_SIZE, MODEL_PATH, MODELS_DIR, SEED, SPLIT_DIR,
+    BATCH_SIZE, CLASS_NAMES_PATH, CNN_REPORTS_DIR, FINE_TUNE_EPOCHS, FINE_TUNE_LAYERS,
+    FINE_TUNE_LR, HEAD_LR, INITIAL_EPOCHS, MODEL_IMG_SIZE, MODEL_PATH, MODELS_DIR, SEED,
+    SPLIT_DIR,
 )
 from model_utils import build_model
 from utils import list_images
@@ -48,6 +52,7 @@ HISTORY_PATH = os.path.join(CNN_REPORTS_DIR, "training_history.png")
 REPORT_PATH = os.path.join(CNN_REPORTS_DIR, "classification_report.txt")
 CONFUSION_PATH = os.path.join(CNN_REPORTS_DIR, "confusion_matrix.png")
 METRICS_PATH = os.path.join(CNN_REPORTS_DIR, "metrics_cnn.json")
+HISTORY_JSON_PATH = os.path.join(CNN_REPORTS_DIR, "history.json")
 
 os.makedirs(MODELS_DIR, exist_ok=True)
 os.makedirs(CNN_REPORTS_DIR, exist_ok=True)
@@ -93,11 +98,58 @@ def compute_weights(class_names):
     return {i: float(w) for i, w in enumerate(weights)}
 
 
-def early_stopping():
-    """Nova instância a cada etapa, para não herdar o estado da etapa anterior."""
-    return tf.keras.callbacks.EarlyStopping(
-        monitor="val_loss", patience=3, restore_best_weights=True
-    )
+def stage_callbacks():
+    """Callbacks de uma etapa; instâncias novas a cada etapa, para não herdar estado.
+
+    No Keras 3 instalado, EarlyStopping(restore_best_weights=True) restaura os
+    pesos da época de menor val_loss em on_train_end MESMO QUE o early stopping
+    não dispare (a etapa chega ao número máximo de épocas). Por isso não é
+    preciso ModelCheckpoint para garantir os melhores pesos ao fim da etapa.
+    """
+    return [
+        tf.keras.callbacks.EarlyStopping(
+            monitor="val_loss", patience=4, restore_best_weights=True, verbose=1,
+        ),
+        tf.keras.callbacks.ReduceLROnPlateau(
+            monitor="val_loss", factor=0.3, patience=2, min_lr=1e-6, verbose=1,
+        ),
+    ]
+
+
+def configure_fine_tuning(base_model):
+    """Destrava as últimas FINE_TUNE_LAYERS camadas da base, mantendo TODAS as
+    BatchNormalization congeladas (senão elas atualizam as estatísticas com os
+    batches do treino e o modelo desestabiliza no início do fine-tuning).
+
+    Retorna (camadas treináveis, BN congeladas entre as destravadas, total de BN).
+    """
+    base_model.trainable = True
+    for layer in base_model.layers[:-FINE_TUNE_LAYERS]:
+        layer.trainable = False
+
+    bn_layers = [l for l in base_model.layers
+                 if isinstance(l, tf.keras.layers.BatchNormalization)]
+    bn_refrozen = sum(l.trainable for l in bn_layers)
+    for layer in bn_layers:
+        layer.trainable = False
+
+    n_trainable = sum(l.trainable for l in base_model.layers)
+    return n_trainable, bn_refrozen, len(bn_layers)
+
+
+def save_history_json(history_initial, history_fine, path=HISTORY_JSON_PATH):
+    """Salva as métricas por época das duas etapas (inclui learning_rate)."""
+    stages = {}
+    for name, history in [("head", history_initial), ("fine_tune", history_fine)]:
+        metrics = {k: [float(v) for v in vals] for k, vals in history.history.items()}
+        stages[name] = {
+            "epochs": len(metrics["loss"]),
+            "best_epoch": int(np.argmin(metrics["val_loss"])) + 1,  # pesos restaurados
+            "metrics": metrics,
+        }
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(stages, f, indent=2)
+    print(f"Histórico salvo em: {path}")
 
 
 def short_name(class_name):
@@ -111,6 +163,7 @@ def short_name(class_name):
 
 
 def plot_history(history_initial, history_fine, path=HISTORY_PATH):
+    # Épocas realmente executadas na etapa 1 (pode ser < INITIAL_EPOCHS com early stopping)
     n_initial = len(history_initial.history["accuracy"])
     fig, axes = plt.subplots(1, 2, figsize=(13, 5))
 
@@ -210,7 +263,7 @@ def main():
     print("\nConstruindo modelo (augmentation + MobileNetV2 + head customizada)...")
     model, base_model = build_model(num_classes=len(class_names))
     model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=HEAD_LR),
         loss="sparse_categorical_crossentropy",
         metrics=["accuracy"],
     )
@@ -224,17 +277,18 @@ def main():
         validation_data=val_ds,
         epochs=INITIAL_EPOCHS,
         class_weight=class_weight,
-        callbacks=[early_stopping()],
+        callbacks=stage_callbacks(),
     )
 
     print("\nEtapa 2: fine-tuning das últimas camadas da base...")
-    base_model.trainable = True
-    # Congela tudo exceto as últimas FINE_TUNE_LAYERS camadas
-    for layer in base_model.layers[:-FINE_TUNE_LAYERS]:
-        layer.trainable = False
+    n_trainable, bn_refrozen, n_bn = configure_fine_tuning(base_model)
+    print(f"Camadas treináveis na base: {n_trainable} de {len(base_model.layers)} "
+          f"(últimas {FINE_TUNE_LAYERS}, sem as BatchNormalization)")
+    print(f"BatchNormalization congeladas entre as destravadas: {bn_refrozen} "
+          f"(total de BN na base, todas congeladas: {n_bn})")
 
     model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=FINE_TUNE_LR),
         loss="sparse_categorical_crossentropy",
         metrics=["accuracy"],
     )
@@ -244,7 +298,7 @@ def main():
         validation_data=val_ds,
         epochs=FINE_TUNE_EPOCHS,
         class_weight=class_weight,
-        callbacks=[early_stopping()],
+        callbacks=stage_callbacks(),
     )
 
     train_time = time.time() - start
@@ -254,6 +308,7 @@ def main():
     print(f"Modelo salvo em: {MODEL_PATH}")
 
     plot_history(history_initial, history_fine)
+    save_history_json(history_initial, history_fine)
 
     print("\nAvaliando no conjunto de TESTE...")
     evaluate(model, test_ds, class_names, train_time)

@@ -104,15 +104,20 @@ Etapas do treino:
    para que as classes pequenas não sejam ignoradas.
 4. **Transfer learning**: a MobileNetV2 é carregada com pesos do ImageNet
    e inicialmente congelada; apenas a camada de classificação (13 classes)
-   é treinada.
-5. **Fine-tuning**: as últimas ~30 camadas da MobileNetV2 são
-   descongeladas e re-treinadas com uma taxa de aprendizado bem menor,
-   permitindo que o modelo se especialize nas características específicas
-   das doenças de folhas.
-6. **Early stopping**: em cada etapa, o treino é interrompido quando a
-   `val_loss` (loss de validação) para de melhorar, com paciência de 3
-   épocas, restaurando os melhores pesos. Isso evita overfitting e tempo de
-   treino desnecessário.
+   é treinada, por até 10 épocas com learning rate 1e-3.
+5. **Fine-tuning**: as últimas 50 camadas da MobileNetV2 são descongeladas
+   e re-treinadas por até 20 épocas com learning rate 1e-4, permitindo que
+   o modelo se especialize nas características específicas das doenças de
+   folhas. As camadas **BatchNormalization continuam congeladas**: se
+   fossem destravadas, passariam a atualizar suas estatísticas com os
+   batches do treino, o que desestabilizou o modelo no início do
+   fine-tuning na rodada anterior (`reports/cnn_run1/`).
+6. **Early stopping e ReduceLROnPlateau**: em cada etapa, o treino é
+   interrompido quando a `val_loss` (loss de validação) para de melhorar
+   por 4 épocas, e o learning rate é multiplicado por 0.3 sempre que ela
+   fica 2 épocas sem melhorar (mínimo 1e-6). Ao fim de cada etapa, o
+   modelo fica com os pesos da época de menor `val_loss`, mesmo que a
+   etapa chegue ao limite de épocas sem o early stopping disparar.
 
 ### Resultados
 
