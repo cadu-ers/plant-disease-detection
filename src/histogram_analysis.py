@@ -9,29 +9,21 @@ intensidade numa imagem de exemplo.
 Uso:
     python src/histogram_analysis.py                      -> imagem aleatória de data/
     python src/histogram_analysis.py caminho/da/imagem.jpg -> imagem específica
+
+Gera:
+    reports/histograma_exemplo.png
 """
 
-import sys
-import random
 import os
+import sys
 
 import cv2
-import numpy as np
 import matplotlib.pyplot as plt
 
-DATA_DIR = "data"
-OUTPUT_PATH = "reports/histograma_exemplo.png"
+from config import DATA_DIR, REPORTS_DIR
+from utils import pick_random_image
 
-
-def pick_random_image():
-    classes = [d for d in os.listdir(DATA_DIR)
-               if os.path.isdir(os.path.join(DATA_DIR, d))]
-    class_name = random.choice(classes)
-    class_dir = os.path.join(DATA_DIR, class_name)
-    images = [f for f in os.listdir(class_dir)
-              if f.lower().endswith((".jpg", ".jpeg", ".png"))]
-    img_name = random.choice(images)
-    return os.path.join(class_dir, img_name)
+OUTPUT_PATH = os.path.join(REPORTS_DIR, "histograma_exemplo.png")
 
 
 def compute_histogram(img_gray):
@@ -40,7 +32,7 @@ def compute_histogram(img_gray):
 
 
 def main():
-    img_path = sys.argv[1] if len(sys.argv) > 1 else pick_random_image()
+    img_path = sys.argv[1] if len(sys.argv) > 1 else pick_random_image(DATA_DIR)[0]
     print(f"Imagem usada: {img_path}")
 
     img = cv2.imread(img_path)

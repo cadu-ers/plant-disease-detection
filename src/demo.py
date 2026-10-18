@@ -1,46 +1,32 @@
 """
-Pega uma imagem (aleatória ou informada), roda o pipeline de
-processamento de imagem + predição do modelo, e salva o resultado
-(imagem + texto) na pasta rotina_demo/.
+Rotina de demonstração: pega uma imagem (aleatória ou informada), segmenta a
+folha, roda a predição do modelo treinado e salva o resultado.
 
 Uso:
     python src/demo.py                          -> imagem aleatória de data/
     python src/demo.py caminho/da/imagem.jpg     -> imagem específica
+
+Gera:
+    rotina_demo/resultado_<timestamp>.png   -> imagem original + folha segmentada
+    rotina_demo/resultado_<timestamp>.txt   -> classe predita, confiança e top 3
 """
 
-import sys
-import random
 import os
+import sys
 from datetime import datetime
 
-import numpy as np
 import cv2
 import matplotlib.pyplot as plt
+import numpy as np
 import tensorflow as tf
 
-# Permite importar módulos de src/ ao rodar "python src/demo.py" a partir da raiz
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from preprocessing import segment_image  # noqa: E402
-
-DATA_DIR = "data"
-MODEL_PATH = "models/plant_disease_model.keras"
-OUTPUT_DIR = "rotina_demo"
-IMG_SIZE = (160, 160)
-
-
-def pick_random_image():
-    classes = [d for d in os.listdir(DATA_DIR)
-               if os.path.isdir(os.path.join(DATA_DIR, d))]
-    class_name = random.choice(classes)
-    class_dir = os.path.join(DATA_DIR, class_name)
-    images = [f for f in os.listdir(class_dir)
-              if f.lower().endswith((".jpg", ".jpeg", ".png"))]
-    img_name = random.choice(images)
-    return os.path.join(class_dir, img_name), class_name
+from config import DATA_DIR, DEMO_DIR, MODEL_IMG_SIZE, MODEL_PATH
+from preprocessing import segment_image
+from utils import list_classes, pick_random_image
 
 
 def predict(model, segmented, class_names):
-    img = cv2.resize(segmented, IMG_SIZE)
+    img = cv2.resize(segmented, MODEL_IMG_SIZE)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     img_array = np.expand_dims(img, axis=0)
 
@@ -52,7 +38,7 @@ def predict(model, segmented, class_names):
 
 
 def save_result(original, segmented, true_class, predicted_class, confidence, top3):
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    os.makedirs(DEMO_DIR, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     fig, axes = plt.subplots(1, 2, figsize=(9, 5))
@@ -70,10 +56,10 @@ def save_result(original, segmented, true_class, predicted_class, confidence, to
     )
     plt.tight_layout()
 
-    img_path = os.path.join(OUTPUT_DIR, f"resultado_{timestamp}.png")
+    img_path = os.path.join(DEMO_DIR, f"resultado_{timestamp}.png")
     plt.savefig(img_path)
 
-    txt_path = os.path.join(OUTPUT_DIR, f"resultado_{timestamp}.txt")
+    txt_path = os.path.join(DEMO_DIR, f"resultado_{timestamp}.txt")
     with open(txt_path, "w", encoding="utf-8") as f:
         f.write(f"Classe real: {true_class}\n")
         f.write(f"Classe predita: {predicted_class}\n")
@@ -92,14 +78,11 @@ def main():
         img_path = sys.argv[1]
         true_class = "(imagem informada manualmente)"
     else:
-        img_path, true_class = pick_random_image()
+        img_path, true_class = pick_random_image(DATA_DIR)
 
     print(f"Imagem: {img_path} (classe real: {true_class})")
 
-    class_names = sorted(
-        d for d in os.listdir(DATA_DIR)
-        if os.path.isdir(os.path.join(DATA_DIR, d))
-    )
+    class_names = list_classes(DATA_DIR)
 
     model = tf.keras.models.load_model(MODEL_PATH)
 

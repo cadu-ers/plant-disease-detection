@@ -1,8 +1,9 @@
-opencv-python
-numpy
-pandas
-scikit-image
-scikit-learn
-matplotlib
-tensorflow
+opencv-python==5.0.0.93
+numpy==2.4.6
+pandas==3.0.6
+scikit-image==0.26.0
+scikit-learn==1.9.1
+matplotlib==3.11.2
+tensorflow==2.21.0
+# kagglehub não estava instalado no ambiente de referência; fixar a versão ao instalar
 kagglehub

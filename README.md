@@ -16,18 +16,18 @@ partir do dataset PlantVillage.
 
 O projeto tem como objetivo identificar, a partir de uma imagem de folha,
 se a planta está saudável ou apresenta algum tipo de doença. O pipeline de
-processamento de imagens (implementado em `src/preprocessing.py`) segue as
-seguintes etapas:
+processamento de imagens segue as etapas abaixo (1 a 4 em
+`src/preprocessing.py`; a 5 em `src/features.py`):
 
 1. **Leitura e redimensionamento**: cada imagem é carregada e padronizada
    para 224x224 pixels, garantindo uma entrada uniforme para as etapas
    seguintes.
-2. **Conversão de espaço de cor (RGB → HSV)**: o espaço HSV separa
-   informação de matiz (cor), saturação e brilho, o que facilita a
-   segmentação por cor em comparação ao RGB.
-3. **Suavização / remoção de ruído**: aplicação de um filtro Gaussian Blur
+2. **Suavização / remoção de ruído**: aplicação de um filtro Gaussian Blur
    (kernel 5x5), reduzindo ruídos de captura e pequenas imperfeições que
    poderiam atrapalhar a segmentação.
+3. **Conversão de espaço de cor (BGR → HSV)**: o OpenCV lê as imagens em
+   BGR; o espaço HSV separa informação de matiz (cor), saturação e brilho,
+   o que facilita a segmentação por cor.
 4. **Segmentação da folha**: a máscara é a união (`cv2.bitwise_or`) de
    duas faixas de cor em HSV (`cv2.inRange`): os tons de verde da folha e
    os tons de lesão (manchas marrons/amarelas, H ~8–35). Em seguida, são
@@ -62,10 +62,11 @@ seguintes etapas:
      `Potato___Early_blight`) não são separáveis apenas por limiar de HSV.
      Uma melhoria futura seria segmentar a folha com GrabCut ou com um
      modelo de segmentação (ex.: U-Net).
-5. **Extração de features clássicas** (complementar): histograma de cor
-   (H, S, V) e descritores de textura via matriz de co-ocorrência (GLCM) —
-   contraste, homogeneidade, energia e correlação — salvos em
-   `features.csv` para fins de análise.
+5. **Extração de features clássicas** (complementar, em `src/features.py`):
+   histograma de cor (H, S, V) e descritores de textura via matriz de
+   co-ocorrência (GLCM) — contraste, homogeneidade, energia e correlação.
+   Essa etapa foi separada do `preprocessing.py` (que agora só segmenta) e
+   será usada pelo classificador híbrido (features clássicas + CNN).
 
 ## Descrição detalhada da integração com IA — Pipeline completo
 
@@ -75,7 +76,7 @@ alimenta um modelo de classificação baseado em **transfer learning**
 
 ```
 Imagem bruta
-   → Pré-processamento (resize, HSV, blur)
+   → Pré-processamento (resize, blur, HSV)
    → Segmentação da folha (remoção de fundo)
    → [ramo IA]     → Modelo MobileNetV2 (pré-treinada em ImageNet)
                     → Camada de classificação customizada (GlobalAveragePooling + Dropout + Dense)
@@ -140,7 +141,12 @@ Utilizamos um subconjunto do dataset, com as classes de **tomate** e
 ├── data/                  # implementar o dataset nessa pasta!
 ├── reports/               # gráfico de treino e relatório de classificação
 ├── src/
-│   ├── preprocessing.py    # pipeline de processamento de imagens
+│   ├── config.py           # constantes compartilhadas (caminhos, tamanhos, seed, limiares HSV)
+│   ├── utils.py            # funções auxiliares para listar classes/imagens e sortear uma imagem
+│   ├── download_dataset.py # baixa o PlantVillage e copia as classes de tomate/batata para data/
+│   ├── preprocessing.py    # pipeline de processamento de imagens (segmentação -> data_processed/)
+│   ├── features.py         # extração de features clássicas (cor + textura) para o classificador híbrido
+│   ├── check_segmentation.py  # compara a máscara antiga e a nova (reports/segmentation_*.png)
 │   ├── model_utils.py      # arquitetura do modelo (compartilhada entre treino e demo)
 │   ├── train_model.py      # treino do modelo de IA
 │   ├── demo.py             # rotina de demonstração (predição em uma imagem)

@@ -1,13 +1,22 @@
-"""Baixa o PlantVillage do Kaggle e prepara as classes de tomate e batata."""
+"""
+Baixa o PlantVillage do Kaggle e copia só as classes de tomate e batata
+para data/.
+
+Uso:
+    python src/download_dataset.py
+
+Gera:
+    data/<NomeDaClasse>/*.jpg   -> 13 classes de tomate e batata
+"""
 
 import os
 import shutil
 
 import kagglehub
 
+from config import DATA_DIR, IMAGE_EXTENSIONS
+
 DATASET_HANDLE = "emmarex/plantdisease"
-DATA_DIR = "data"
-IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png")
 CLASS_PREFIXES = ("tomato", "potato")
 
 def download_dataset():

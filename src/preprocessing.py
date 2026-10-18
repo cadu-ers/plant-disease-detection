@@ -1,52 +1,36 @@
 """
-Pipeline de pré-processamento de imagens para detecção de doenças em folhas.
+Pipeline de pré-processamento: segmenta as folhas do dataset e salva as
+imagens segmentadas, que alimentam o treino da CNN.
 
-Etapas:
+Etapas (na ordem em que são executadas):
     1. Leitura e resize
-    2. Conversão de espaço de cor (RGB -> HSV)
-    3. Suavização / remoção de ruído (Gaussian Blur)
-    4. Segmentação da folha (máscara de cor em HSV)
-    5. Extração de features (histograma de cor + textura GLCM)
+    2. Suavização / remoção de ruído (Gaussian Blur)
+    3. Conversão de espaço de cor (BGR -> HSV; o OpenCV lê as imagens em BGR)
+    4. Segmentação da folha (máscara verde + lesão, contorno externo preenchido)
+
+A extração de features clássicas fica em src/features.py.
 
 Uso:
     python src/preprocessing.py
+    (requer o dataset em data/<NomeDaClasse>/*.jpg)
 
-Requer que o dataset esteja em: data/<NomeDaClasse>/*.jpg
 Gera:
     data_processed/<NomeDaClasse>/*.jpg   -> imagens segmentadas, prontas pro treino da CNN
-    features.csv                          -> features clássicas (cor + textura) por imagem, opcional
 """
 
 import os
+
 import cv2
 import numpy as np
-import pandas as pd
-from skimage.feature import graycomatrix, graycoprops
 
-# ---------- Configurações ----------
-DATA_DIR = "data"
-OUTPUT_DIR = "data_processed"
-IMG_SIZE = (224, 224)
-
-# Faixa de verde em HSV, usada para separar a folha do fundo.
-# Ajuste esses valores se o fundo do seu dataset não for removido corretamente.
-LOWER_GREEN = np.array([25, 40, 40])
-UPPER_GREEN = np.array([90, 255, 255])
-
-# Faixa de tons de lesão (manchas marrons/amarelas) em HSV.
-# As lesões das doenças têm matiz abaixo do verde (H ~8–35) e ficavam fora da
-# máscara de verde, virando "buracos" pretos.
-# S >= 40 segura o fundo bege/cinza do PlantVillage (baixa saturação, mas matiz
-# na faixa do marrom); com S menor o fundo passa e o contorno preenchido o engole.
-# V >= 20 recupera as lesões escuras na borda da folha, que falhavam com V >= 30.
-LOWER_LESION = np.array([8, 40, 20])
-UPPER_LESION = np.array([35, 255, 255])
-
-# Área mínima (fração da imagem) para aceitar o maior contorno como a folha.
-MIN_LEAF_AREA_RATIO = 0.05
+from config import (
+    DATA_DIR, PROCESSED_DIR, SEG_IMG_SIZE,
+    LOWER_GREEN, UPPER_GREEN, LOWER_LESION, UPPER_LESION, MIN_LEAF_AREA_RATIO,
+)
+from utils import list_classes, list_images
 
 
-def load_and_resize(path, size=IMG_SIZE):
+def load_and_resize(path, size=SEG_IMG_SIZE):
     """Etapa 1: leitura e redimensionamento."""
     img = cv2.imread(path)
     if img is None:
@@ -56,20 +40,27 @@ def load_and_resize(path, size=IMG_SIZE):
 
 
 def denoise(img):
-    """Etapa 3: suavização / remoção de ruído."""
+    """Etapa 2: suavização / remoção de ruído."""
     return cv2.GaussianBlur(img, (5, 5), 0)
 
 
 def to_hsv(img):
-    """Etapa 2: conversão de espaço de cor RGB -> HSV."""
+    """Etapa 3: conversão de espaço de cor BGR -> HSV."""
     return cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
 
-def segment_leaf(img_bgr, img_hsv):
-    """Etapa 4: segmentação da folha (máscara verde + lesão, contorno externo preenchido)."""
+def segment_leaf(img_bgr, img_hsv, lower_lesion=None):
+    """Etapa 4: segmentação da folha (máscara verde + lesão, contorno externo preenchido).
+
+    lower_lesion: limite inferior [H, S, V] da máscara de lesão; se None,
+    usa config.LOWER_LESION.
+    """
+    if lower_lesion is None:
+        lower_lesion = LOWER_LESION
+
     # a) Máscara de verde unida à máscara de tons de lesão (marrom/amarelo)
     green_mask = cv2.inRange(img_hsv, LOWER_GREEN, UPPER_GREEN)
-    lesion_mask = cv2.inRange(img_hsv, LOWER_LESION, UPPER_LESION)
+    lesion_mask = cv2.inRange(img_hsv, lower_lesion, UPPER_LESION)
     mask = cv2.bitwise_or(green_mask, lesion_mask)
 
     # b) Limpeza morfológica (abertura remove ruído pequeno, fechamento fecha buracos)
@@ -94,10 +85,11 @@ def segment_leaf(img_bgr, img_hsv):
     return segmented, mask
 
 
-def segment_image(path):
+def segment_image(path, lower_lesion=None):
     """Executa as etapas 1–4 em uma imagem e retorna (original, segmented, mask).
 
     `original` é a imagem redimensionada, antes da suavização.
+    lower_lesion é repassado para segment_leaf (None = config.LOWER_LESION).
     Retorna None se a imagem não puder ser lida.
     """
     original = load_and_resize(path)
@@ -105,80 +97,33 @@ def segment_image(path):
         return None
     img = denoise(original)
     img_hsv = to_hsv(img)
-    segmented, mask = segment_leaf(img, img_hsv)
+    segmented, mask = segment_leaf(img, img_hsv, lower_lesion)
     return original, segmented, mask
 
 
-def extract_color_histogram(img_hsv, bins=8):
-    """Etapa 5a: histograma de cor (H, S, V) normalizado."""
-    hist = cv2.calcHist([img_hsv], [0, 1, 2], None, [bins, bins, bins],
-                         [0, 180, 0, 256, 0, 256])
-    cv2.normalize(hist, hist)
-    return hist.flatten()
-
-
-def extract_texture_features(img_bgr):
-    """Etapa 5b: features de textura via GLCM (matriz de co-ocorrência)."""
-    gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
-    glcm = graycomatrix(gray, distances=[1], angles=[0], levels=256,
-                         symmetric=True, normed=True)
-    contrast = graycoprops(glcm, "contrast")[0, 0]
-    homogeneity = graycoprops(glcm, "homogeneity")[0, 0]
-    energy = graycoprops(glcm, "energy")[0, 0]
-    correlation = graycoprops(glcm, "correlation")[0, 0]
-    return {
-        "contrast": contrast,
-        "homogeneity": homogeneity,
-        "energy": energy,
-        "correlation": correlation,
-    }
-
-
 def process_dataset():
-    records = []
-    classes = [d for d in os.listdir(DATA_DIR)
-               if os.path.isdir(os.path.join(DATA_DIR, d))]
-
-    for class_name in classes:
+    total = 0
+    for class_name in list_classes(DATA_DIR):
         class_dir = os.path.join(DATA_DIR, class_name)
-        out_class_dir = os.path.join(OUTPUT_DIR, class_name)
+        out_class_dir = os.path.join(PROCESSED_DIR, class_name)
         os.makedirs(out_class_dir, exist_ok=True)
 
-        images = [f for f in os.listdir(class_dir)
-                  if f.lower().endswith((".jpg", ".jpeg", ".png"))]
+        images = list_images(class_dir)
+        n = len(images)
+        saved = 0
+        for i, fname in enumerate(images, start=1):
+            result = segment_image(os.path.join(class_dir, fname))
+            if result is not None:
+                _, segmented, _ = result
+                cv2.imwrite(os.path.join(out_class_dir, fname), segmented)
+                saved += 1
+            print(f"\r{class_name}: {i}/{n}", end="", flush=True)
 
-        print(f"Processando classe '{class_name}' ({len(images)} imagens)...")
+        print(f"\r{class_name}: {saved}/{n} imagens segmentadas")
+        total += saved
 
-        for fname in images:
-            path = os.path.join(class_dir, fname)
-
-            img = load_and_resize(path)
-            if img is None:
-                continue
-
-            img = denoise(img)
-            img_hsv = to_hsv(img)
-            segmented, mask = segment_leaf(img, img_hsv)
-
-            # Salva a imagem segmentada (entrada da CNN)
-            out_path = os.path.join(out_class_dir, fname)
-            cv2.imwrite(out_path, segmented)
-
-            # Extrai features clássicas (opcional, útil pra análise/relatório)
-            color_hist = extract_color_histogram(img_hsv)
-            texture = extract_texture_features(segmented)
-
-            record = {"filename": fname, "class": class_name}
-            record.update(texture)
-            for i, val in enumerate(color_hist):
-                record[f"hist_{i}"] = val
-            records.append(record)
-
-    df = pd.DataFrame(records)
-    df.to_csv("features.csv", index=False)
-    print(f"\nConcluído. {len(df)} imagens processadas.")
-    print(f"Imagens segmentadas em: {OUTPUT_DIR}/")
-    print(f"Features salvas em: features.csv")
+    print(f"\nConcluído. {total} imagens processadas.")
+    print(f"Imagens segmentadas em: {PROCESSED_DIR}/")
 
 
 if __name__ == "__main__":

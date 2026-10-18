@@ -6,6 +6,8 @@ __pycache__/
 *.py[cod]
 data/
 data_processed/
+data_split/
 models/
 rotina_demo/
 features.csv
+.idea/

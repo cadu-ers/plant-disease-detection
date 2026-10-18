@@ -14,45 +14,48 @@ Uso:
     python src/train_model.py
 
 Gera:
-    models/plant_disease_model.h5
+    models/plant_disease_model.keras
     reports/training_history.png
     reports/classification_report.txt
 """
 
 import os
-import numpy as np
-import matplotlib.pyplot as plt
-import tensorflow as tf
-from sklearn.metrics import classification_report, confusion_matrix
 
-from model_utils import build_model, IMG_SIZE
+import matplotlib.pyplot as plt
+import numpy as np
+import tensorflow as tf
+from sklearn.metrics import classification_report
+
+from config import MODEL_IMG_SIZE, MODEL_PATH, MODELS_DIR, PROCESSED_DIR, REPORTS_DIR, SEED
+from model_utils import build_model
 
 # ---------- Configurações ----------
-DATA_DIR = "data_processed"
 BATCH_SIZE = 32
 INITIAL_EPOCHS = 8
 FINE_TUNE_EPOCHS = 5
-SEED = 42
 
-os.makedirs("models", exist_ok=True)
-os.makedirs("reports", exist_ok=True)
+HISTORY_PATH = os.path.join(REPORTS_DIR, "training_history.png")
+REPORT_PATH = os.path.join(REPORTS_DIR, "classification_report.txt")
+
+os.makedirs(MODELS_DIR, exist_ok=True)
+os.makedirs(REPORTS_DIR, exist_ok=True)
 
 
 def load_datasets():
     train_ds = tf.keras.utils.image_dataset_from_directory(
-        DATA_DIR,
+        PROCESSED_DIR,
         validation_split=0.2,
         subset="training",
         seed=SEED,
-        image_size=IMG_SIZE,
+        image_size=MODEL_IMG_SIZE,
         batch_size=BATCH_SIZE,
     )
     val_ds = tf.keras.utils.image_dataset_from_directory(
-        DATA_DIR,
+        PROCESSED_DIR,
         validation_split=0.2,
         subset="validation",
         seed=SEED,
-        image_size=IMG_SIZE,
+        image_size=MODEL_IMG_SIZE,
         batch_size=BATCH_SIZE,
     )
     class_names = train_ds.class_names
@@ -65,7 +68,7 @@ def load_datasets():
     return train_ds, val_ds, class_names
 
 
-def plot_history(history_initial, history_fine, path="reports/training_history.png"):
+def plot_history(history_initial, history_fine, path=HISTORY_PATH):
     acc = history_initial.history["accuracy"] + history_fine.history["accuracy"]
     val_acc = history_initial.history["val_accuracy"] + history_fine.history["val_accuracy"]
 
@@ -100,9 +103,9 @@ def evaluate(model, val_ds, class_names):
     )
     print(report)
 
-    with open("reports/classification_report.txt", "w", encoding="utf-8") as f:
+    with open(REPORT_PATH, "w", encoding="utf-8") as f:
         f.write(report)
-    print("Relatório salvo em: reports/classification_report.txt")
+    print(f"Relatório salvo em: {REPORT_PATH}")
 
 
 def main():
@@ -151,7 +154,7 @@ def main():
     )
 
     print("\nSalvando modelo...")
-    model.save("models/plant_disease_model.keras")
+    model.save(MODEL_PATH)
 
     plot_history(history_initial, history_fine)
 

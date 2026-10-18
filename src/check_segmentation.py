@@ -10,28 +10,28 @@ Uso:
     python src/check_segmentation.py
     python src/check_segmentation.py --s 40 --v 20 --out reports/segmentation_S40_V20.png
         -> testa outros limites mínimos de S e V da máscara de lesão
+
+Gera:
+    reports/segmentation_comparison.png   (ou o arquivo passado em --out)
 """
 
 import argparse
 import os
-import sys
 import random
 
 import cv2
-import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+import numpy as np  # noqa: E402
 
-# Permite importar módulos de src/ ao rodar "python src/check_segmentation.py" a partir da raiz
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import preprocessing  # noqa: E402
-from preprocessing import (  # noqa: E402
-    DATA_DIR, LOWER_GREEN, UPPER_GREEN, segment_image, denoise, to_hsv,
+from config import (  # noqa: E402
+    DATA_DIR, REPORTS_DIR, SEED, LOWER_GREEN, UPPER_GREEN, LOWER_LESION,
 )
+from preprocessing import segment_image, denoise, to_hsv  # noqa: E402
+from utils import list_classes, list_images  # noqa: E402
 
-OUTPUT_PATH = os.path.join("reports", "segmentation_comparison.png")
-SEED = 42
+OUTPUT_PATH = os.path.join(REPORTS_DIR, "segmentation_comparison.png")
 N_CLASSES = 6
 N_PER_CLASS = 2
 
@@ -47,14 +47,12 @@ def old_green_mask(original):
 
 
 def pick_samples(rng):
-    classes = sorted(d for d in os.listdir(DATA_DIR)
-                     if os.path.isdir(os.path.join(DATA_DIR, d)))
+    classes = list_classes(DATA_DIR)
     chosen = rng.sample(classes, N_CLASSES)
     samples = []
     for class_name in chosen:
         class_dir = os.path.join(DATA_DIR, class_name)
-        images = sorted(f for f in os.listdir(class_dir)
-                        if f.lower().endswith((".jpg", ".jpeg", ".png")))
+        images = list_images(class_dir)
         for fname in rng.sample(images, N_PER_CLASS):
             samples.append((class_name, os.path.join(class_dir, fname)))
     return samples
@@ -64,9 +62,9 @@ def parse_args():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--s", type=int, default=None,
-                        help="S mínimo da máscara de lesão (default: valor de preprocessing.py)")
+                        help="S mínimo da máscara de lesão (default: valor de config.py)")
     parser.add_argument("--v", type=int, default=None,
-                        help="V mínimo da máscara de lesão (default: valor de preprocessing.py)")
+                        help="V mínimo da máscara de lesão (default: valor de config.py)")
     parser.add_argument("--out", default=OUTPUT_PATH,
                         help=f"arquivo de saída (default: {OUTPUT_PATH})")
     return parser.parse_args()
@@ -75,13 +73,12 @@ def parse_args():
 def main():
     args = parse_args()
 
-    # Sobrescreve os limites da máscara de lesão só nesta execução, se informados
-    lower = preprocessing.LOWER_LESION.copy()
+    # Limites da máscara de lesão desta execução (default: config.LOWER_LESION)
+    lower = LOWER_LESION.copy()
     if args.s is not None:
         lower[1] = args.s
     if args.v is not None:
         lower[2] = args.v
-    preprocessing.LOWER_LESION = lower
     print(f"LOWER_LESION = {lower.tolist()}")
 
     rng = random.Random(SEED)
@@ -92,7 +89,7 @@ def main():
     fig, axes = plt.subplots(len(samples), 4, figsize=(12, 3 * len(samples)))
 
     for row, (class_name, path) in enumerate(samples):
-        result = segment_image(path)
+        result = segment_image(path, lower_lesion=lower)
         if result is None:
             print(f"Não foi possível ler: {path}")
             continue
