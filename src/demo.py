@@ -3,15 +3,23 @@ Rotina de demonstração: pega uma imagem (aleatória ou informada), segmenta a
 folha, roda a predição do modelo treinado e salva o resultado.
 
 Uso:
-    python src/demo.py                          -> imagem aleatória de data/
+    python src/demo.py                          -> imagem aleatória do conjunto de TESTE
     python src/demo.py caminho/da/imagem.jpg     -> imagem específica
+    (requer models/ gerado por src/train_model.py)
+
+Sem argumento, sorteia uma imagem com split == "test" do manifest de
+src/split_dataset.py (imagens nunca vistas no treino) e segmenta a imagem
+original dela. Se o manifest não existir, sorteia de data/ com um aviso.
 
 Gera:
     rotina_demo/resultado_<timestamp>.png   -> imagem original + folha segmentada
     rotina_demo/resultado_<timestamp>.txt   -> classe predita, confiança e top 3
 """
 
+import csv
+import json
 import os
+import random
 import sys
 from datetime import datetime
 
@@ -20,9 +28,31 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 
-from config import DATA_DIR, DEMO_DIR, MODEL_IMG_SIZE, MODEL_PATH
+from config import (
+    CLASS_NAMES_PATH, DATA_DIR, DEMO_DIR, MODEL_IMG_SIZE, MODEL_PATH, SPLIT_MANIFEST,
+)
 from preprocessing import segment_image
-from utils import list_classes, pick_random_image
+from utils import pick_random_image
+
+
+def load_class_names():
+    """Ordem das classes usada no treino (índice de saída do modelo -> nome)."""
+    if not os.path.exists(CLASS_NAMES_PATH):
+        sys.exit(f"Erro: {CLASS_NAMES_PATH} não encontrado. Rode train_model.py primeiro.")
+    with open(CLASS_NAMES_PATH, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def pick_test_image():
+    """Sorteia uma imagem do conjunto de teste; retorna (caminho_original, classe)."""
+    if not os.path.exists(SPLIT_MANIFEST):
+        print(f"Aviso: {SPLIT_MANIFEST} não encontrado; sorteando de {DATA_DIR}/ "
+              "(a imagem pode ter sido usada no treino).")
+        return pick_random_image(DATA_DIR)
+    with open(SPLIT_MANIFEST, encoding="utf-8", newline="") as f:
+        test_rows = [row for row in csv.DictReader(f) if row["split"] == "test"]
+    row = random.choice(test_rows)
+    return row["original_path"], row["class"]
 
 
 def predict(model, segmented, class_names):
@@ -74,15 +104,15 @@ def save_result(original, segmented, true_class, predicted_class, confidence, to
 
 
 def main():
+    class_names = load_class_names()
+
     if len(sys.argv) > 1:
         img_path = sys.argv[1]
         true_class = "(imagem informada manualmente)"
     else:
-        img_path, true_class = pick_random_image(DATA_DIR)
+        img_path, true_class = pick_test_image()
 
     print(f"Imagem: {img_path} (classe real: {true_class})")
-
-    class_names = list_classes(DATA_DIR)
 
     model = tf.keras.models.load_model(MODEL_PATH)
 

@@ -1,10 +1,11 @@
 """
-Definição da arquitetura do modelo (MobileNetV2 + cabeça de classificação),
-compartilhada entre train_model.py e demo.py.
+Definição da arquitetura do modelo (data augmentation + MobileNetV2 + cabeça
+de classificação), usada pelo train_model.py.
 
-Mantida separada para permitir reconstruir a mesma arquitetura e carregar
-apenas os pesos salvos (model.load_weights), contornando um problema de
-compatibilidade do Keras ao desserializar o modelo completo salvo em .h5.
+O modelo treinado é salvo inteiro em .keras (model.save) e carregado com
+tf.keras.models.load_model no demo.py, que não precisa reconstruir a
+arquitetura. As camadas de augmentation ficam dentro do modelo e só atuam
+no treino.
 
 Uso:
     from model_utils import build_model
@@ -29,8 +30,17 @@ def build_model(num_classes, weights="imagenet"):
     )
     base_model.trainable = False
 
+    # Data augmentation: essas camadas só atuam no treino (na inferência passam direto)
+    augmentation = tf.keras.Sequential([
+        layers.RandomFlip("horizontal_and_vertical"),
+        layers.RandomRotation(0.1),
+        layers.RandomZoom(0.1),
+        layers.RandomContrast(0.1),
+    ], name="augmentation")
+
     inputs = tf.keras.Input(shape=MODEL_IMG_SIZE + (3,))
-    x = tf.keras.applications.mobilenet_v2.preprocess_input(inputs)
+    x = augmentation(inputs)
+    x = tf.keras.applications.mobilenet_v2.preprocess_input(x)
     x = base_model(x, training=False)
     x = layers.GlobalAveragePooling2D()(x)
     x = layers.Dropout(0.2)(x)

@@ -3,16 +3,16 @@ Compara a segmentação antiga (máscara só de verde) com a nova
 (verde + lesão, contorno externo preenchido) em imagens de exemplo.
 
 Pega 2 imagens aleatórias de 6 classes diferentes de data/ (seed fixa)
-e salva uma grade em reports/segmentation_comparison.png com as colunas:
+e salva uma grade em reports/segmentation/segmentation_comparison.png com as colunas:
     Original | Máscara antiga (só verde) | Máscara nova | Folha segmentada (nova)
 
 Uso:
     python src/check_segmentation.py
-    python src/check_segmentation.py --s 40 --v 20 --out reports/segmentation_S40_V20.png
+    python src/check_segmentation.py --s 40 --v 20 --out reports/segmentation/segmentation_S40_V20.png
         -> testa outros limites mínimos de S e V da máscara de lesão
 
 Gera:
-    reports/segmentation_comparison.png   (ou o arquivo passado em --out)
+    reports/segmentation/segmentation_comparison.png   (ou o arquivo passado em --out)
 """
 
 import argparse
@@ -26,12 +26,12 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
 from config import (  # noqa: E402
-    DATA_DIR, REPORTS_DIR, SEED, LOWER_GREEN, UPPER_GREEN, LOWER_LESION,
+    DATA_DIR, SEGMENTATION_REPORTS_DIR, SEED, LOWER_GREEN, UPPER_GREEN, LOWER_LESION,
 )
 from preprocessing import segment_image, denoise, to_hsv  # noqa: E402
 from utils import list_classes, list_images  # noqa: E402
 
-OUTPUT_PATH = os.path.join(REPORTS_DIR, "segmentation_comparison.png")
+OUTPUT_PATH = os.path.join(SEGMENTATION_REPORTS_DIR, "segmentation_comparison.png")
 N_CLASSES = 6
 N_PER_CLASS = 2
 

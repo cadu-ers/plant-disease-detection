@@ -44,7 +44,7 @@ processamento de imagens segue as etapas abaixo (1 a 4 em
      sintoma da doença era justamente o que estava sendo apagado. A
      comparação entre as duas abordagens pode ser gerada com
      `python src/check_segmentation.py` (salva em
-     `reports/segmentation_comparison.png`).
+     `reports/segmentation/segmentation_comparison.png`).
    - **Escolha dos limiares da máscara de lesão**: o matiz (H ~8–35) foi
      fixado e testamos os mínimos de saturação (S) e brilho (V) nas mesmas
      12 imagens (seed 42), com
@@ -52,10 +52,10 @@ processamento de imagens segue as etapas abaixo (1 a 4 em
 
      | S | V | Lesões na borda | Vazamento de fundo | Imagem |
      |---|---|---|---|---|
-     | 40 | 30 | Lesões escuras da borda cortadas | Não | `reports/segmentation_S40_V30.png` |
-     | 25 | 20 | Recuperadas | Sim: o fundo bege/cinza tem matiz na faixa do marrom, e só a saturação separa os dois | `reports/segmentation_S25_V20.png` |
-     | **40** | **20** | **Recuperadas (escolhido)** | **Não** | `reports/segmentation_S40_V20.png` |
-     | 35 | 20 | Recuperadas | Sombra/fundo começam a entrar | `reports/segmentation_S35_V20.png` |
+     | 40 | 30 | Lesões escuras da borda cortadas | Não | `reports/segmentation/segmentation_S40_V30.png` |
+     | 25 | 20 | Recuperadas | Sim: o fundo bege/cinza tem matiz na faixa do marrom, e só a saturação separa os dois | `reports/segmentation/segmentation_S25_V20.png` |
+     | **40** | **20** | **Recuperadas (escolhido)** | **Não** | `reports/segmentation/segmentation_comparison.png` |
+     | 35 | 20 | Recuperadas | Sombra/fundo começam a entrar | `reports/segmentation/segmentation_S35_V20.png` |
 
    - **Limitação conhecida**: lesões de borda com saturação tão baixa
      quanto a do fundo (ex.: o recorte em uma das imagens de
@@ -78,7 +78,8 @@ alimenta um modelo de classificação baseado em **transfer learning**
 Imagem bruta
    → Pré-processamento (resize, blur, HSV)
    → Segmentação da folha (remoção de fundo)
-   → [ramo IA]     → Modelo MobileNetV2 (pré-treinada em ImageNet)
+   → [ramo IA]     → Data augmentation (flip, rotação, zoom, contraste; só no treino)
+                    → Modelo MobileNetV2 (pré-treinada em ImageNet)
                     → Camada de classificação customizada (GlobalAveragePooling + Dropout + Dense)
                     → Fine-tuning das últimas camadas da base
    → Predição da classe (saudável ou tipo de doença)
@@ -86,20 +87,36 @@ Imagem bruta
 
 Etapas do treino:
 
-1. **Carregamento**: as imagens de `data_processed/` são divididas
-   automaticamente em 80% treino / 20% validação.
-2. **Transfer learning**: a MobileNetV2 é carregada com pesos do ImageNet
+1. **Carregamento**: as imagens de `data_processed/` são divididas por
+   `src/split_dataset.py` em 70% treino / 15% validação / 15% teste
+   (estratificado por classe, seed 42), com a divisão registrada em
+   `data_split/split_manifest.csv`. A validação é usada só no early
+   stopping; as métricas finais são calculadas no teste, que nunca entra
+   no treino.
+2. **Data augmentation**: flip horizontal e vertical, rotação, zoom e
+   contraste aleatórios, aplicados por camadas dentro do próprio modelo.
+   Elas só atuam no treino; na validação, no teste e na demo a imagem
+   passa sem alteração.
+3. **Class weight balanceado**: o dataset é desbalanceado (~21x entre
+   `Tomato__Tomato_YellowLeaf__Curl_Virus`, com 3208 imagens, e
+   `Potato___healthy`, com 152). Cada classe recebe um peso inversamente
+   proporcional à sua frequência no treino (`compute_class_weight("balanced")`),
+   para que as classes pequenas não sejam ignoradas.
+4. **Transfer learning**: a MobileNetV2 é carregada com pesos do ImageNet
    e inicialmente congelada; apenas a camada de classificação (13 classes)
    é treinada.
-3. **Fine-tuning**: as últimas ~30 camadas da MobileNetV2 são
+5. **Fine-tuning**: as últimas ~30 camadas da MobileNetV2 são
    descongeladas e re-treinadas com uma taxa de aprendizado bem menor,
    permitindo que o modelo se especialize nas características específicas
    das doenças de folhas.
-4. **Early stopping**: o treino é interrompido automaticamente caso a
-   acurácia de validação pare de melhorar, evitando overfitting e tempo de
+6. **Early stopping**: em cada etapa, o treino é interrompido quando a
+   `val_loss` (loss de validação) para de melhorar, com paciência de 3
+   épocas, restaurando os melhores pesos. Isso evita overfitting e tempo de
    treino desnecessário.
 
 ### Resultados
+
+> Resultados abaixo são do modelo baseline (reports/baseline_v1/); serão atualizados com o modelo corrigido.
 
 O modelo atingiu **89% de acurácia** no conjunto de validação. Classes
 com sintomas visuais bem distintos (ex: `Tomato_YellowLeaf_Curl_Virus`,
@@ -139,15 +156,25 @@ Utilizamos um subconjunto do dataset, com as classes de **tomate** e
 ```
 .
 ├── data/                  # implementar o dataset nessa pasta!
-├── reports/               # gráfico de treino e relatório de classificação
+├── models/
+│   ├── plant_disease_model.keras  # modelo atual (gerado por train_model.py, não versionado)
+│   ├── class_names.json    # ordem das classes usada no treino
+│   └── baseline_v1/        # modelo antigo, antes das correções (não versionado)
+├── reports/
+│   ├── baseline_v1/        # relatórios do modelo antigo + README explicando o que mudou
+│   ├── cnn/                # saídas do train_model.py (relatório, matriz de confusão, métricas, histórico)
+│   ├── segmentation/       # comparações de segmentação (check_segmentation.py)
+│   ├── split_summary.csv   # contagem de imagens por classe x split
+│   └── histograma_exemplo.png  # saída do histogram_analysis.py
 ├── src/
 │   ├── config.py           # constantes compartilhadas (caminhos, tamanhos, seed, limiares HSV)
 │   ├── utils.py            # funções auxiliares para listar classes/imagens e sortear uma imagem
 │   ├── download_dataset.py # baixa o PlantVillage e copia as classes de tomate/batata para data/
 │   ├── preprocessing.py    # pipeline de processamento de imagens (segmentação -> data_processed/)
+│   ├── split_dataset.py    # divisão estratificada treino/val/teste (70/15/15) -> data_split/ + manifest
 │   ├── features.py         # extração de features clássicas (cor + textura) para o classificador híbrido
-│   ├── check_segmentation.py  # compara a máscara antiga e a nova (reports/segmentation_*.png)
-│   ├── model_utils.py      # arquitetura do modelo (compartilhada entre treino e demo)
+│   ├── check_segmentation.py  # compara a máscara antiga e a nova (reports/segmentation/)
+│   ├── model_utils.py      # arquitetura do modelo (augmentation + MobileNetV2 + cabeça)
 │   ├── train_model.py      # treino do modelo de IA
 │   ├── demo.py             # rotina de demonstração (predição em uma imagem)
 │   └── histogram_analysis.py  # script de documentação (histograma antes/depois da normalização)
@@ -161,6 +188,7 @@ Utilizamos um subconjunto do dataset, com as classes de **tomate** e
 pip install -r requirements.txt
 python src/download_dataset.py
 python src/preprocessing.py
+python src/split_dataset.py
 python src/train_model.py
 python src/demo.py
 ```
@@ -179,6 +207,7 @@ workspace, pois o projeto é montado em `/app`:
 ```bash
 docker compose run --rm app python src/download_dataset.py
 docker compose run --rm app python src/preprocessing.py
+docker compose run --rm app python src/split_dataset.py
 docker compose run --rm app python src/train_model.py
 docker compose run --rm app python src/demo.py
 ```

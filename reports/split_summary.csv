@@ -1,0 +1,15 @@
+class,train,val,test,total
+Potato___Early_blight,700,150,150,1000
+Potato___Late_blight,700,150,150,1000
+Potato___healthy,106,23,23,152
+Tomato_Bacterial_spot,1489,319,319,2127
+Tomato_Early_blight,700,150,150,1000
+Tomato_Late_blight,1336,286,287,1909
+Tomato_Leaf_Mold,666,143,143,952
+Tomato_Septoria_leaf_spot,1240,265,266,1771
+Tomato_Spider_mites_Two_spotted_spider_mite,1173,251,252,1676
+Tomato__Target_Spot,983,211,210,1404
+Tomato__Tomato_YellowLeaf__Curl_Virus,2246,481,481,3208
+Tomato__Tomato_mosaic_virus,261,56,56,373
+Tomato_healthy,1114,239,238,1591
+TOTAL,12714,2724,2725,18163

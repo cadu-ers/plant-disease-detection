@@ -2,118 +2,212 @@
 Treino do modelo de classificação de doenças em folhas via transfer learning.
 
 Pipeline de IA:
-    data_processed/ (imagens segmentadas)
-        -> tf.data.Dataset (train/val split automático)
-        -> MobileNetV2 pré-treinada (ImageNet), congelada
-        -> camada de classificação customizada
-        -> treino inicial (só a cabeça)
-        -> fine-tuning (descongela últimas camadas da base)
-        -> avaliação + salva o modelo
+    data_split/{train,val,test} (imagens segmentadas, divisão fixa 70/15/15)
+        -> tf.data.Dataset por split
+        -> data augmentation (só no treino) + MobileNetV2 pré-treinada (ImageNet)
+        -> etapa 1: treina só a cabeça de classificação (base congelada)
+        -> etapa 2: fine-tuning das últimas FINE_TUNE_LAYERS camadas da base
+        -> class_weight balanceado nas duas etapas; EarlyStopping pela validação
+        -> avaliação final no TESTE (nunca usado no treino nem na seleção de modelo)
 
 Uso:
     python src/train_model.py
+    (requer data_split/ gerado por src/split_dataset.py)
 
 Gera:
     models/plant_disease_model.keras
-    reports/training_history.png
-    reports/classification_report.txt
+    models/class_names.json
+    reports/cnn/training_history.png
+    reports/cnn/classification_report.txt
+    reports/cnn/confusion_matrix.png
+    reports/cnn/metrics_cnn.json
 """
 
+import json
 import os
+import re
+import time
 
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
-from sklearn.metrics import classification_report
+from sklearn.metrics import (
+    accuracy_score, classification_report, confusion_matrix,
+    f1_score, precision_score, recall_score,
+)
+from sklearn.utils.class_weight import compute_class_weight
 
-from config import MODEL_IMG_SIZE, MODEL_PATH, MODELS_DIR, PROCESSED_DIR, REPORTS_DIR, SEED
+from config import (
+    BATCH_SIZE, CLASS_NAMES_PATH, FINE_TUNE_EPOCHS, FINE_TUNE_LAYERS, INITIAL_EPOCHS,
+    CNN_REPORTS_DIR, MODEL_IMG_SIZE, MODEL_PATH, MODELS_DIR, SEED, SPLIT_DIR,
+)
 from model_utils import build_model
+from utils import list_images
 
-# ---------- Configurações ----------
-BATCH_SIZE = 32
-INITIAL_EPOCHS = 8
-FINE_TUNE_EPOCHS = 5
-
-HISTORY_PATH = os.path.join(REPORTS_DIR, "training_history.png")
-REPORT_PATH = os.path.join(REPORTS_DIR, "classification_report.txt")
+HISTORY_PATH = os.path.join(CNN_REPORTS_DIR, "training_history.png")
+REPORT_PATH = os.path.join(CNN_REPORTS_DIR, "classification_report.txt")
+CONFUSION_PATH = os.path.join(CNN_REPORTS_DIR, "confusion_matrix.png")
+METRICS_PATH = os.path.join(CNN_REPORTS_DIR, "metrics_cnn.json")
 
 os.makedirs(MODELS_DIR, exist_ok=True)
-os.makedirs(REPORTS_DIR, exist_ok=True)
+os.makedirs(CNN_REPORTS_DIR, exist_ok=True)
+
+
+def load_split(split, shuffle):
+    return tf.keras.utils.image_dataset_from_directory(
+        os.path.join(SPLIT_DIR, split),
+        shuffle=shuffle,
+        seed=SEED,
+        image_size=MODEL_IMG_SIZE,
+        batch_size=BATCH_SIZE,
+    )
 
 
 def load_datasets():
-    train_ds = tf.keras.utils.image_dataset_from_directory(
-        PROCESSED_DIR,
-        validation_split=0.2,
-        subset="training",
-        seed=SEED,
-        image_size=MODEL_IMG_SIZE,
-        batch_size=BATCH_SIZE,
-    )
-    val_ds = tf.keras.utils.image_dataset_from_directory(
-        PROCESSED_DIR,
-        validation_split=0.2,
-        subset="validation",
-        seed=SEED,
-        image_size=MODEL_IMG_SIZE,
-        batch_size=BATCH_SIZE,
-    )
+    train_ds = load_split("train", shuffle=True)
+    val_ds = load_split("val", shuffle=False)
+    test_ds = load_split("test", shuffle=False)
+
     class_names = train_ds.class_names
+    if val_ds.class_names != class_names or test_ds.class_names != class_names:
+        raise ValueError("As classes de train/val/test não coincidem. Rode split_dataset.py de novo.")
 
     # Otimização de I/O
     AUTOTUNE = tf.data.AUTOTUNE
-    train_ds = train_ds.cache().shuffle(1000).prefetch(buffer_size=AUTOTUNE)
+    train_ds = train_ds.cache().shuffle(1000, seed=SEED).prefetch(buffer_size=AUTOTUNE)
     val_ds = val_ds.cache().prefetch(buffer_size=AUTOTUNE)
+    test_ds = test_ds.prefetch(buffer_size=AUTOTUNE)
 
-    return train_ds, val_ds, class_names
+    return train_ds, val_ds, test_ds, class_names
+
+
+def compute_weights(class_names):
+    """class_weight "balanced" a partir dos rótulos do treino (contagem de arquivos por classe)."""
+    counts = [len(list_images(os.path.join(SPLIT_DIR, "train", c))) for c in class_names]
+    y_train = np.repeat(np.arange(len(class_names)), counts)
+    weights = compute_class_weight("balanced", classes=np.arange(len(class_names)), y=y_train)
+
+    print("\nPesos por classe (class_weight balanced):")
+    for name, n, w in zip(class_names, counts, weights):
+        print(f"  {name:<45} {n:>5} imagens  peso {w:.3f}")
+    return {i: float(w) for i, w in enumerate(weights)}
+
+
+def early_stopping():
+    """Nova instância a cada etapa, para não herdar o estado da etapa anterior."""
+    return tf.keras.callbacks.EarlyStopping(
+        monitor="val_loss", patience=3, restore_best_weights=True
+    )
+
+
+def short_name(class_name):
+    """Abrevia o nome da classe para os eixos da matriz de confusão."""
+    name = re.sub(r"_+", "_", class_name)
+    name = name.replace("Tomato_Tomato_", "Tomato_")
+    name = name.replace("_Two_spotted_spider_mite", "")
+    name = re.sub(r"^Tomato_", "Tom_", name)
+    name = re.sub(r"^Potato_", "Pot_", name)
+    return name
 
 
 def plot_history(history_initial, history_fine, path=HISTORY_PATH):
-    acc = history_initial.history["accuracy"] + history_fine.history["accuracy"]
-    val_acc = history_initial.history["val_accuracy"] + history_fine.history["val_accuracy"]
+    n_initial = len(history_initial.history["accuracy"])
+    fig, axes = plt.subplots(1, 2, figsize=(13, 5))
 
-    plt.figure(figsize=(8, 5))
-    plt.plot(acc, label="Treino")
-    plt.plot(val_acc, label="Validação")
-    plt.axvline(x=len(history_initial.history["accuracy"]) - 1,
-                color="gray", linestyle="--", label="Início do fine-tuning")
-    plt.title("Acurácia durante o treino")
-    plt.xlabel("Época")
-    plt.ylabel("Acurácia")
-    plt.legend()
+    for ax, metric, title in [(axes[0], "accuracy", "Acurácia"), (axes[1], "loss", "Loss")]:
+        train = history_initial.history[metric] + history_fine.history[metric]
+        val = history_initial.history[f"val_{metric}"] + history_fine.history[f"val_{metric}"]
+        epochs = range(1, len(train) + 1)
+        ax.plot(epochs, train, label="Treino")
+        ax.plot(epochs, val, label="Validação")
+        ax.axvline(x=n_initial + 0.5, color="gray", linestyle="--", label="Início do fine-tuning")
+        ax.set_title(f"{title} durante o treino")
+        ax.set_xlabel("Época")
+        ax.set_ylabel(title)
+        ax.legend()
+
     plt.tight_layout()
     plt.savefig(path)
+    plt.close(fig)
     print(f"Gráfico salvo em: {path}")
 
 
-def evaluate(model, val_ds, class_names):
-    y_true = []
-    y_pred = []
-    for images, labels in val_ds:
-        preds = model.predict(images, verbose=0)
-        y_pred.extend(np.argmax(preds, axis=1))
-        y_true.extend(labels.numpy())
+def plot_confusion_matrix(y_true, y_pred, class_names, path=CONFUSION_PATH):
+    """Matriz de confusão normalizada por linha (cada linha soma 1 = recall da classe)."""
+    cm = confusion_matrix(y_true, y_pred, labels=range(len(class_names)), normalize="true")
+    cm = np.nan_to_num(cm)
+    labels = [short_name(c) for c in class_names]
+
+    fig, ax = plt.subplots(figsize=(14, 12))
+    im = ax.imshow(cm, cmap="Blues", vmin=0, vmax=1)
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+
+    ax.set_xticks(range(len(labels)))
+    ax.set_yticks(range(len(labels)))
+    ax.set_xticklabels(labels, rotation=45, ha="right")
+    ax.set_yticklabels(labels)
+    ax.set_xlabel("Classe predita")
+    ax.set_ylabel("Classe real")
+    ax.set_title("Matriz de confusão (teste, normalizada por linha)")
+
+    for i in range(cm.shape[0]):
+        for j in range(cm.shape[1]):
+            color = "white" if cm[i, j] > 0.5 else "black"
+            ax.text(j, i, f"{cm[i, j]:.2f}", ha="center", va="center", color=color, fontsize=9)
+
+    plt.tight_layout()
+    plt.savefig(path, dpi=120)
+    plt.close(fig)
+    print(f"Matriz de confusão salva em: {path}")
+
+
+def evaluate(model, test_ds, class_names, train_time_seconds):
+    """Avaliação final no conjunto de TESTE."""
+    y_true = np.concatenate([labels.numpy() for _, labels in test_ds])
+    y_pred = np.argmax(model.predict(test_ds, verbose=0), axis=1)
 
     report = classification_report(
-    y_true,
-    y_pred,
-    labels=range(len(class_names)),
-    target_names=class_names,
-    zero_division=0
+        y_true,
+        y_pred,
+        labels=range(len(class_names)),
+        target_names=class_names,
+        zero_division=0,
     )
     print(report)
-
     with open(REPORT_PATH, "w", encoding="utf-8") as f:
         f.write(report)
     print(f"Relatório salvo em: {REPORT_PATH}")
 
+    plot_confusion_matrix(y_true, y_pred, class_names)
+
+    metrics = {
+        "accuracy": accuracy_score(y_true, y_pred),
+        "f1_macro": f1_score(y_true, y_pred, average="macro", zero_division=0),
+        "f1_weighted": f1_score(y_true, y_pred, average="weighted", zero_division=0),
+        "precision_macro": precision_score(y_true, y_pred, average="macro", zero_division=0),
+        "recall_macro": recall_score(y_true, y_pred, average="macro", zero_division=0),
+        "n_test": int(len(y_true)),
+        "train_time_seconds": round(train_time_seconds, 1),
+    }
+    metrics = {k: (float(v) if isinstance(v, np.floating) else v) for k, v in metrics.items()}
+    with open(METRICS_PATH, "w", encoding="utf-8") as f:
+        json.dump(metrics, f, indent=2)
+    print(f"Métricas salvas em: {METRICS_PATH}")
+    print(json.dumps(metrics, indent=2))
+
 
 def main():
     print("Carregando dataset...")
-    train_ds, val_ds, class_names = load_datasets()
+    train_ds, val_ds, test_ds, class_names = load_datasets()
     print(f"Classes encontradas ({len(class_names)}): {class_names}")
 
-    print("\nConstruindo modelo (MobileNetV2 + head customizada)...")
+    with open(CLASS_NAMES_PATH, "w", encoding="utf-8") as f:
+        json.dump(class_names, f, indent=2)
+    print(f"Ordem das classes salva em: {CLASS_NAMES_PATH}")
+
+    class_weight = compute_weights(class_names)
+
+    print("\nConstruindo modelo (augmentation + MobileNetV2 + head customizada)...")
     model, base_model = build_model(num_classes=len(class_names))
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
@@ -122,22 +216,21 @@ def main():
     )
     model.summary()
 
-    early_stop = tf.keras.callbacks.EarlyStopping(
-        monitor="val_loss", patience=3, restore_best_weights=True
-    )
+    start = time.time()
 
     print("\nEtapa 1: treinando apenas a camada de classificação...")
     history_initial = model.fit(
         train_ds,
         validation_data=val_ds,
         epochs=INITIAL_EPOCHS,
-        callbacks=[early_stop],
+        class_weight=class_weight,
+        callbacks=[early_stopping()],
     )
 
     print("\nEtapa 2: fine-tuning das últimas camadas da base...")
     base_model.trainable = True
-    # Congela tudo exceto as últimas ~30 camadas
-    for layer in base_model.layers[:-30]:
+    # Congela tudo exceto as últimas FINE_TUNE_LAYERS camadas
+    for layer in base_model.layers[:-FINE_TUNE_LAYERS]:
         layer.trainable = False
 
     model.compile(
@@ -150,18 +243,24 @@ def main():
         train_ds,
         validation_data=val_ds,
         epochs=FINE_TUNE_EPOCHS,
-        callbacks=[early_stop],
+        class_weight=class_weight,
+        callbacks=[early_stopping()],
     )
+
+    train_time = time.time() - start
 
     print("\nSalvando modelo...")
     model.save(MODEL_PATH)
+    print(f"Modelo salvo em: {MODEL_PATH}")
 
     plot_history(history_initial, history_fine)
 
-    print("\nAvaliando no conjunto de validação...")
-    evaluate(model, val_ds, class_names)
+    print("\nAvaliando no conjunto de TESTE...")
+    evaluate(model, test_ds, class_names, train_time)
 
-    print("\nConcluído!")
+    minutes, seconds = divmod(int(train_time), 60)
+    print(f"\nTempo total de treino: {minutes} min {seconds} s")
+    print("Concluído!")
 
 
 if __name__ == "__main__":
