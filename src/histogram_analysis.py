@@ -1,10 +1,11 @@
 """
-Script de documentação: gera um gráfico comparando o histograma de
+Script de documentação da P1: gera um gráfico comparando o histograma de
 intensidade de uma imagem original com o de sua versão normalizada.
 
-Não faz parte do pipeline principal — é só um material de apoio pra
-documentação/apresentação, mostrando o efeito da normalização de
-intensidade numa imagem de exemplo.
+Material da P1, mantido só como registro. A normalização de intensidade
+min-max mostrada aqui NÃO faz parte do pipeline final: o preprocessing.py
+não normaliza intensidade (as etapas são resize, blur, BGR->HSV e
+segmentação). Não é usado por nenhum outro script.
 
 Uso:
     python src/histogram_analysis.py                      -> imagem aleatória de data/

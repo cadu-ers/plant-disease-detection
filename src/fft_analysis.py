@@ -18,14 +18,18 @@ Preparação de cada imagem (prepare_image):
 
 Uso:
     python src/fft_analysis.py
-    (requer data_split/split_manifest.csv e features_cache/handcrafted.csv)
+    (requer data/, data_split/split_manifest.csv e reports/segmentation/qualidade_segmentacao.csv,
+     gerado por segmentation_report.py; todas as figuras são geradas sem nada do bloco de IA.
+     Só a comparação com SVM usa features_cache/handcrafted.csv, do bloco de IA: se o
+     arquivo não existir, ela é pulada com um aviso)
 
 Gera (em reports/fft/):
     fft_saudavel_vs_doente.png       -> imagem, magnitude, fase, passa-baixa e passa-alta
     fft_magnitude_vs_fase.png        -> reconstrução só com magnitude x só com fase
     blur_espaco_vs_frequencia.png    -> teorema da convolução com o blur do pipeline
     espectro_radial_por_classe.png   -> espectro radial médio e razão alta/baixa por classe
-    fft_svm.csv, fft_svm.png         -> SVM com FFT, clássicas e clássicas + FFT (teste)
+    fft_svm.csv, fft_svm.png         -> SVM com FFT, clássicas e clássicas + FFT (teste);
+                                        só se features_cache/handcrafted.csv existir
 e features_cache/fft_features.csv (descritores FFT de todas as imagens do manifest).
 """
 
@@ -437,7 +441,11 @@ def main():
     figure_radial_spectrum(profiles, fft_df[fft_df["split"] == "train"],
                            os.path.join(FFT_REPORTS_DIR, "espectro_radial_por_classe.png"))
 
-    # SVM no teste
+    # SVM no teste: opcional, porque usa as features clássicas do bloco de IA
+    if not os.path.exists(HANDCRAFTED_PATH):
+        print(f"\nAviso: {HANDCRAFTED_PATH} não encontrado (é gerado por extract_features.py, "
+              "no bloco de IA); comparação com SVM (fft_svm.csv/png) pulada.")
+        return
     results = evaluate_svm(fft_df)
     results.to_csv(os.path.join(FFT_REPORTS_DIR, "fft_svm.csv"), index=False)
     print("\n" + results.round(4).to_string(index=False))

@@ -1,24 +1,33 @@
 """
-Material de segmentação para a apresentação: as etapas da segmentação em
-sequência e uma verificação objetiva da qualidade em TODAS as imagens.
+Figuras e verificação da segmentação (bloco de Processamento de Imagens):
+as etapas da segmentação em sequência, uma verificação objetiva da qualidade
+em TODAS as imagens e a comparação da máscara antiga (só verde) com a nova.
 
 As constantes (faixas HSV, área mínima) e as funções de leitura, blur, HSV e
 segmentação são as reais do pipeline (config.py e preprocessing.py). Os passos
 intermediários são reimplementados aqui só para poder mostrá-los; o script
 confere que a máscara final reimplementada é idêntica à de segment_leaf.
+Não depende de nada do bloco de IA (features_cache/, models/).
 
 Uso:
-    python src/segmentation_report.py
-    (requer data_split/split_manifest.csv e features_cache/handcrafted.csv)
+    python src/segmentation_report.py                -> etapas + qualidade + suspeitos
+    python src/segmentation_report.py --comparacao   -> máscara antiga x nova em 12 imagens
+    python src/segmentation_report.py --comparacao --s 40 --v 20 --out reports/segmentation/segmentation_S40_V20.png
+        -> comparação com outros limites mínimos de S e V da máscara de lesão
+    (requer data/ e data_split/split_manifest.csv)
 
 Gera (em reports/segmentation/):
     etapas_segmentacao.png        -> original até segmentada, para 2 folhas com lesões grandes
     qualidade_segmentacao.csv     -> por imagem: fração de folha, fallback, buracos (antiga x nova)
     qualidade_segmentacao.png     -> fração de folha por classe + buracos antiga x nova
     casos_suspeitos.png           -> as 12 segmentações mais suspeitas
+    segmentation_comparison.png   -> (--comparacao) Original | Máscara antiga | Máscara nova |
+                                     Folha segmentada, 2 imagens de 6 classes (ou o arquivo de --out)
 """
 
+import argparse
 import os
+import random
 import time
 
 import cv2
@@ -30,11 +39,17 @@ import pandas as pd  # noqa: E402
 from joblib import Parallel, delayed  # noqa: E402
 
 from config import (  # noqa: E402
-    HANDCRAFTED_PATH, LOWER_GREEN, LOWER_LESION, MIN_LEAF_AREA_RATIO, SEGMENTATION_REPORTS_DIR,
+    DATA_DIR, LOWER_GREEN, LOWER_LESION, MIN_LEAF_AREA_RATIO, SEED, SEGMENTATION_REPORTS_DIR,
     SPLIT_MANIFEST, UPPER_GREEN, UPPER_LESION,
 )
-from preprocessing import denoise, load_and_resize, segment_leaf, to_hsv  # noqa: E402
-from utils import short_name, slide_style  # noqa: E402
+from preprocessing import (  # noqa: E402
+    denoise, load_and_resize, segment_image, segment_leaf, to_hsv,
+)
+from utils import list_classes, list_images, short_name, slide_style  # noqa: E402
+
+COMPARISON_PATH = os.path.join(SEGMENTATION_REPORTS_DIR, "segmentation_comparison.png")
+COMPARISON_N_CLASSES = 6
+COMPARISON_N_PER_CLASS = 2
 
 STEP_CLASSES = ["Potato___Late_blight", "Tomato_Early_blight"]
 LESION_QUANTILE = 0.90          # lesão grande, mas não o caso mais extremo
@@ -80,7 +95,10 @@ def segmentation_steps(path):
 
 
 def old_green_mask(hsv):
-    """Máscara antiga: só verde + abertura e fechamento (sem contorno preenchido)."""
+    """Máscara antiga: só verde + abertura e fechamento (sem contorno preenchido).
+
+    Mantida aqui só para comparação (figura de comparação e contagem de buracos).
+    """
     mask = cv2.inRange(hsv, LOWER_GREEN, UPPER_GREEN)
     kernel = np.ones((5, 5), np.uint8)
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
@@ -221,22 +239,118 @@ def figure_suspects(suspects, path):
     print(f"Figura salva em: {path}")
 
 
+# ---------- Comparação máscara antiga x nova (--comparacao) ----------
+def pick_comparison_samples(rng):
+    """2 imagens aleatórias de 6 classes de data/ (seed fixa)."""
+    chosen = rng.sample(list_classes(DATA_DIR), COMPARISON_N_CLASSES)
+    samples = []
+    for class_name in chosen:
+        class_dir = os.path.join(DATA_DIR, class_name)
+        for fname in rng.sample(list_images(class_dir), COMPARISON_N_PER_CLASS):
+            samples.append((class_name, os.path.join(class_dir, fname)))
+    return samples
+
+
+def run_comparison(s_min, v_min, out_path):
+    """Original | Máscara antiga (só verde) | Máscara nova | Folha segmentada (nova)."""
+    # Limites da máscara de lesão desta execução (default: config.LOWER_LESION)
+    lower = LOWER_LESION.copy()
+    if s_min is not None:
+        lower[1] = s_min
+    if v_min is not None:
+        lower[2] = v_min
+    print(f"LOWER_LESION = {lower.tolist()}")
+
+    samples = pick_comparison_samples(random.Random(SEED))
+    titles = ["Original", "Máscara antiga (só verde)", "Máscara nova",
+              "Folha segmentada (nova)"]
+    fig, axes = plt.subplots(len(samples), 4, figsize=(12, 3 * len(samples)))
+
+    for row, (class_name, path) in enumerate(samples):
+        result = segment_image(path, lower_lesion=lower)
+        if result is None:
+            print(f"Não foi possível ler: {path}")
+            continue
+        original, segmented, new_mask = result
+        old_mask = old_green_mask(to_hsv(denoise(original)))
+
+        panels = [rgb(original), old_mask, new_mask, rgb(segmented)]
+        for col, panel in enumerate(panels):
+            ax = axes[row, col]
+            ax.imshow(panel, cmap="gray" if panel.ndim == 2 else None)
+            ax.set_xticks([])
+            ax.set_yticks([])
+            if row == 0:
+                ax.set_title(titles[col], fontsize=11)
+        axes[row, 0].set_ylabel(class_name, fontsize=8, rotation=0,
+                                ha="right", va="center")
+
+    plt.tight_layout()
+    out_dir = os.path.dirname(out_path)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
+    plt.savefig(out_path, dpi=100)
+    plt.close(fig)
+    print(f"Comparação salva em: {out_path}")
+
+
+# ---------- Main ----------
+def lesion_ratio_one(path):
+    """Fração dos pixels da folha (máscara final) na faixa LOWER_LESION/UPPER_LESION.
+
+    Mesmo cálculo da feature lesion_ratio de features.py, feito aqui direto da
+    máscara para o bloco de PI não depender de features_cache/.
+    """
+    s = segmentation_steps(path)
+    leaf = s["mask"] > 0
+    return float(((s["lesion"] > 0) & leaf).sum() / leaf.sum())
+
+
+def pick_step_examples(manifest):
+    """Por classe, a imagem de treino no percentil 90 da proporção de lesão."""
+    examples = []
+    for c in STEP_CLASSES:
+        rows = manifest[(manifest["class"] == c) & (manifest["split"] == "train")].copy()
+        rows["lesion_ratio"] = Parallel(n_jobs=-1)(
+            delayed(lesion_ratio_one)(p) for p in rows["original_path"])
+        target = rows["lesion_ratio"].quantile(LESION_QUANTILE)
+        pick = rows.iloc[(rows["lesion_ratio"] - target).abs().argsort().iloc[0]]
+        examples.append((c, pick["original_path"]))
+        print(f"Etapas: {c} -> {pick['original_path']} (lesion_ratio = {pick['lesion_ratio']:.2f})")
+    return examples
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--comparacao", action="store_true",
+                        help="gera só a comparação máscara antiga x nova")
+    parser.add_argument("--s", type=int, default=None,
+                        help="(--comparacao) S mínimo da máscara de lesão (default: config.py)")
+    parser.add_argument("--v", type=int, default=None,
+                        help="(--comparacao) V mínimo da máscara de lesão (default: config.py)")
+    parser.add_argument("--out", default=COMPARISON_PATH,
+                        help=f"(--comparacao) arquivo de saída (default: {COMPARISON_PATH})")
+    args = parser.parse_args()
+    if not args.comparacao and (args.s is not None or args.v is not None
+                                or args.out != COMPARISON_PATH):
+        parser.error("--s, --v e --out só valem junto com --comparacao")
+    return args
+
+
 def main():
+    args = parse_args()
+    if args.comparacao:
+        run_comparison(args.s, args.v, args.out)
+        return
+
     slide_style()
     os.makedirs(SEGMENTATION_REPORTS_DIR, exist_ok=True)
     manifest = pd.read_csv(SPLIT_MANIFEST)
 
     # f. Etapas: imagem de treino no percentil 90 da proporção de lesão
-    hand = pd.read_csv(HANDCRAFTED_PATH, usecols=["class", "filename", "split", "lesion_ratio"])
-    hand = hand.merge(manifest[["class", "filename", "original_path"]], on=["class", "filename"])
-    examples = []
-    for c in STEP_CLASSES:
-        rows = hand[(hand["class"] == c) & (hand["split"] == "train")]
-        target = rows["lesion_ratio"].quantile(LESION_QUANTILE)
-        pick = rows.iloc[(rows["lesion_ratio"] - target).abs().argsort().iloc[0]]
-        examples.append((c, pick["original_path"]))
-        print(f"Etapas: {c} -> {pick['original_path']} (lesion_ratio = {pick['lesion_ratio']:.2f})")
-    figure_steps(examples, os.path.join(SEGMENTATION_REPORTS_DIR, "etapas_segmentacao.png"))
+    figure_steps(pick_step_examples(manifest),
+                 os.path.join(SEGMENTATION_REPORTS_DIR, "etapas_segmentacao.png"))
 
     # g. Qualidade em todas as imagens
     t0 = time.time()

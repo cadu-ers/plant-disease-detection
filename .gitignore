@@ -23,6 +23,7 @@ env/
 *.pt
 *.pth
 *.keras
+*.joblib
 
 # Sistema
 .DS_Store
