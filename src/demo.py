@@ -5,6 +5,7 @@ folha, roda a predição do modelo treinado e salva o resultado.
 Uso:
     python src/demo.py                          -> imagem aleatória do conjunto de TESTE
     python src/demo.py caminho/da/imagem.jpg     -> imagem específica
+    python src/demo.py --verbose [...]           -> mostra os logs do TensorFlow (depuração)
     (requer models/ gerado por src/train_model.py)
 
 Sem argumento, sorteia uma imagem com split == "test" do manifest de
@@ -23,10 +24,22 @@ import random
 import sys
 from datetime import datetime
 
-import cv2
-import matplotlib.pyplot as plt
-import numpy as np
-import tensorflow as tf
+# --verbose mantém os logs informativos do TensorFlow (depuração). Tem que ser
+# lido antes do "import tensorflow", que é quando essas variáveis são aplicadas.
+VERBOSE = "--verbose" in sys.argv
+if VERBOSE:
+    sys.argv.remove("--verbose")
+else:
+    os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+    os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+
+import cv2  # noqa: E402
+import matplotlib.pyplot as plt  # noqa: E402
+import numpy as np  # noqa: E402
+import tensorflow as tf  # noqa: E402
+
+if not VERBOSE:
+    tf.get_logger().setLevel("ERROR")
 
 from config import (
     CLASS_NAMES_PATH, DATA_DIR, DEMO_DIR, MODEL_IMG_SIZE, MODEL_PATH, SPLIT_MANIFEST,
