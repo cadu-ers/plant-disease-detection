@@ -165,3 +165,5 @@ imagens de campo é necessário antes de qualquer uso prático.
 ![Comparativo no controle](../reports/ia/hibrido/controle_refit_treino/comparativo.png)
 
 ![Matriz de confusão do SVM híbrido](../reports/ia/hibrido/confusion_matrix_SVM_hibrido.png)
+
+A demonstração ao vivo, em uma imagem, é feita com `python src/demo_ia.py` (ver [Como reproduzir](07_como_reproduzir.md#demonstração-da-ia-demo_iapy)).

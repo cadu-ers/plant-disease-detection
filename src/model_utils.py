@@ -3,8 +3,8 @@ Definição da arquitetura do modelo (data augmentation + MobileNetV2 + cabeça
 de classificação), usada pelo train_model.py.
 
 O modelo treinado é salvo inteiro em .keras (model.save) e carregado com
-tf.keras.models.load_model no demo.py, que não precisa reconstruir a
-arquitetura. As camadas de augmentation ficam dentro do modelo e só atuam
+tf.keras.models.load_model no extract_features.py e no demo_ia.py, que não
+precisam reconstruir a arquitetura. As camadas de augmentation ficam dentro do modelo e só atuam
 no treino.
 
 Uso:

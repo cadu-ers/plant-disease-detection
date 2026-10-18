@@ -97,3 +97,5 @@ resultados do classificador híbrido estão em [`reports/ia/hibrido/`](../report
 ![Histórico de treino da CNN](../reports/ia/cnn/training_history.png)
 
 ![Matriz de confusão da CNN no teste](../reports/ia/cnn/confusion_matrix.png)
+
+A demonstração ao vivo, em uma imagem, é feita com `python src/demo_ia.py` (ver [Como reproduzir](07_como_reproduzir.md#demonstração-da-ia-demo_iapy)).

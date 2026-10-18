@@ -36,7 +36,10 @@ CNN_REPORTS_DIR = os.path.join(IA_REPORTS_DIR, "cnn")                    # train
 HYBRID_REPORTS_DIR = os.path.join(IA_REPORTS_DIR, "hibrido")             # hybrid_classifier.py
 HYBRID_CONTROL_REPORTS_DIR = os.path.join(HYBRID_REPORTS_DIR, "controle_refit_treino")
 HISTORY_REPORTS_DIR = os.path.join(IA_REPORTS_DIR, "historico")          # rodadas antigas (registro)
-DEMO_DIR = "rotina_demo"             # saídas da rotina de demonstração
+DEMO_DIR = "rotina_demo"             # saídas das rotinas de demonstração (não versionado)
+PI_DEMO_DIR = os.path.join(DEMO_DIR, "pi")                  # demo_pi.py
+PI_DEMO_LAST_PATH = os.path.join(PI_DEMO_DIR, "ultima.json")  # último resultado do demo_pi (lido pelo demo_ia --ultima-pi)
+IA_DEMO_DIR = os.path.join(DEMO_DIR, "ia")                  # demo_ia.py
 FEATURES_DIR = "features_cache"      # features extraídas (handcrafted + embeddings da CNN)
 
 MODEL_PATH = os.path.join(MODELS_DIR, "plant_disease_model.keras")

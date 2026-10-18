@@ -27,7 +27,7 @@ import sys
 import time
 import warnings
 
-# --verbose mantém os logs informativos do TensorFlow (mesmo esquema do demo.py).
+# --verbose mantém os logs informativos do TensorFlow (mesmo esquema do demo_ia.py).
 # Tem que ser lido antes do "import tensorflow" (feito só em compute_embeddings).
 VERBOSE = "--verbose" in sys.argv
 if not VERBOSE:
@@ -98,6 +98,28 @@ def extract_all_handcrafted(df, n_jobs):
     return pd.concat([df[["class", "filename", "split"]], feats], axis=1)
 
 
+def build_embedding_extractor(model):
+    """Modelo com duas saídas: embedding (GlobalAveragePooling2D, 1280-d) e softmax.
+
+    Um único passe dá os dois. Na inferência as camadas de augmentation e o
+    Dropout ficam inativos. Usado também pelo demo_ia.py.
+    """
+    import tensorflow as tf
+    gap = next(layer for layer in model.layers
+               if isinstance(layer, tf.keras.layers.GlobalAveragePooling2D))
+    return tf.keras.Model(model.inputs, [gap.output, model.outputs[0]])
+
+
+def decode_and_resize(image_bytes):
+    """Mesmo carregamento do image_dataset_from_directory usado no treino da CNN:
+    decode RGB + resize bilinear para MODEL_IMG_SIZE, float 0-255.
+    Recebe os bytes do arquivo de imagem (tensor string). Usado também pelo demo_ia.py.
+    """
+    import tensorflow as tf
+    img = tf.io.decode_image(image_bytes, channels=3, expand_animations=False)
+    return tf.image.resize(img, MODEL_IMG_SIZE, method="bilinear")
+
+
 def compute_embeddings(df):
     """Embeddings (GAP, 1280-d) e softmax da CNN, na ordem de df."""
     import tensorflow as tf
@@ -110,17 +132,10 @@ def compute_embeddings(df):
         raise ValueError(f"As classes do manifest não batem com {CLASS_NAMES_PATH}.")
 
     model = tf.keras.models.load_model(MODEL_PATH)
-    gap = next(layer for layer in model.layers
-               if isinstance(layer, tf.keras.layers.GlobalAveragePooling2D))
-    # Um único passe dá os embeddings (GAP) e as probabilidades (saída do modelo).
-    # Na inferência as camadas de augmentation e o Dropout ficam inativos.
-    extractor = tf.keras.Model(model.inputs, [gap.output, model.outputs[0]])
+    extractor = build_embedding_extractor(model)
 
     def load(path):
-        # Mesmo carregamento do image_dataset_from_directory usado no treino da CNN:
-        # decode RGB + resize bilinear para MODEL_IMG_SIZE, float 0-255
-        img = tf.io.decode_image(tf.io.read_file(path), channels=3, expand_animations=False)
-        return tf.image.resize(img, MODEL_IMG_SIZE, method="bilinear")
+        return decode_and_resize(tf.io.read_file(path))
 
     ds = (tf.data.Dataset.from_tensor_slices(df["processed_path"].tolist())
           .map(load, num_parallel_calls=tf.data.AUTOTUNE)

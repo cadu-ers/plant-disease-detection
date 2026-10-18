@@ -57,7 +57,7 @@ pip install -r requirements.txt
 python src/run_pi.py          # bloco de Processamento de Imagens
 python src/run_ia.py          # bloco de IA (treina a CNN só se não houver modelo)
 python src/demo_pi.py         # demonstração do Processamento de Imagens
-python src/demo.py            # demonstração em uma imagem
+python src/demo_ia.py         # demonstração da IA
 ```
 
 Opções dos orquestradores, execução manual script por script, Docker e testes:
@@ -70,7 +70,7 @@ Opções dos orquestradores, execução manual script por script, Docker e teste
 | Orquestração | `run_pi.py`, `run_ia.py`, `run_all.py`, `orchestration.py` |
 | Processamento de Imagens | `download_dataset.py`, `preprocessing.py`, `split_dataset.py`, `data_overview.py`, `segmentation_report.py`, `fft_analysis.py`, `features.py`, `histogram_analysis.py` (P1) |
 | Inteligência Artificial | `model_utils.py`, `train_model.py`, `extract_features.py`, `hybrid_classifier.py`, `expert_system/` |
-| Demo | `demo_pi.py` (Processamento de Imagens), `demo.py` |
+| Demo | `demo_pi.py` (Processamento de Imagens), `demo_ia.py` (IA) |
 | Comuns e testes | `config.py`, `utils.py`, `tests/` |
 
 Saídas: `reports/pi/` e `reports/ia/` (figuras e métricas de cada bloco, com

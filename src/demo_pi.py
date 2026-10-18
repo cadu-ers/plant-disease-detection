@@ -23,7 +23,6 @@ Gera (em rotina_demo/pi/):
 import argparse
 import json
 import os
-import random
 import sys
 import time
 from datetime import datetime
@@ -39,7 +38,8 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from config import (  # noqa: E402
-    DATA_DIR, DEMO_DIR, FFT_FEATURES_PATH, LOWER_GREEN, LOWER_LESION, SEGMENTATION_QUALITY_PATH,
+    FFT_FEATURES_PATH, LOWER_GREEN, LOWER_LESION, PI_DEMO_DIR, PI_DEMO_LAST_PATH,
+    SEGMENTATION_QUALITY_PATH,
     SPLIT_MANIFEST, UPPER_GREEN, UPPER_LESION,
 )
 from fft_analysis import (  # noqa: E402
@@ -48,10 +48,8 @@ from fft_analysis import (  # noqa: E402
 )
 from preprocessing import segment_image  # noqa: E402
 from segmentation_report import lesion_ratio_from_steps, rgb, segmentation_steps  # noqa: E402
-from utils import list_classes, slide_style  # noqa: E402
+from utils import describe_image, load_manifest, pick_test_image, slide_style  # noqa: E402
 
-PI_DEMO_DIR = os.path.join(DEMO_DIR, "pi")
-LAST_RESULT_PATH = os.path.join(PI_DEMO_DIR, "ultima.json")
 
 COLOR_LEAF, COLOR_OTHER = "#2a78d6", "#52514e"          # folha = azul; imagem inteira/fundo = cinza
 COLOR_GREEN, COLOR_LESION, COLOR_BOTH = "#1baf7a", "#eda100", "#e87ba4"
@@ -70,42 +68,6 @@ def parse_args():
     if args.imagem and args.classe:
         parser.error("use um caminho de imagem OU --classe, não os dois")
     return args
-
-
-def load_manifest():
-    return pd.read_csv(SPLIT_MANIFEST) if os.path.exists(SPLIT_MANIFEST) else None
-
-
-def pick_test_image(manifest, class_name, seed):
-    """Sorteia uma imagem do teste (opcionalmente de uma classe). Retorna (caminho, classe, split)."""
-    if manifest is None:
-        sys.exit(f"{SPLIT_MANIFEST} não encontrado. Rode antes: python src/run_pi.py "
-                 "(ou informe o caminho de uma imagem)")
-    test = manifest[manifest["split"] == "test"]
-    if class_name:
-        if class_name not in set(test["class"]):
-            sys.exit(f"Classe '{class_name}' não encontrada. Classes: "
-                     + ", ".join(sorted(test["class"].unique())))
-        test = test[test["class"] == class_name]
-    rows = test.sort_values(["class", "filename"])
-    row = rows.iloc[random.Random(seed).randrange(len(rows))]
-    return row["original_path"], row["class"], "test"
-
-
-def describe_given_image(path, manifest):
-    """Classe real e split de uma imagem informada: pelo manifest ou pela pasta da classe."""
-    if not os.path.exists(path):
-        sys.exit(f"Imagem não encontrada: {path}")
-    if manifest is not None:
-        target = os.path.normcase(os.path.abspath(path))
-        match = manifest[manifest["original_path"].map(
-            lambda p: os.path.normcase(os.path.abspath(p))) == target]
-        if len(match):
-            return match.iloc[0]["class"], match.iloc[0]["split"]
-    folder = os.path.basename(os.path.dirname(os.path.abspath(path)))
-    if os.path.isdir(DATA_DIR) and folder in list_classes(DATA_DIR):
-        return folder, None
-    return None, None
 
 
 # ---------- Medidas ----------
@@ -276,11 +238,14 @@ def main():
     plt.switch_backend("Agg" if args.sem_janela else INTERACTIVE_BACKEND)
 
     manifest = load_manifest()
-    if args.imagem:
-        path = args.imagem
-        class_name, split = describe_given_image(path, manifest)
-    else:
-        path, class_name, split = pick_test_image(manifest, args.classe, args.seed)
+    try:
+        if args.imagem:
+            path = args.imagem
+            class_name, split = describe_image(path, manifest)
+        else:
+            path, class_name, split = pick_test_image(manifest, args.classe, args.seed)
+    except ValueError as e:
+        sys.exit(str(e))
     print(f"Imagem: {path}")
     print(f"Classe real: {class_name or 'desconhecida'} | split: {split or 'fora do manifest'}")
 
@@ -318,12 +283,12 @@ def main():
         "figure": png_path.replace("\\", "/"),
     }
     json_path = os.path.join(PI_DEMO_DIR, f"resultado_{stamp}.json")
-    for out in (json_path, LAST_RESULT_PATH):
+    for out in (json_path, PI_DEMO_LAST_PATH):
         with open(out, "w", encoding="utf-8") as f:
             json.dump(result, f, indent=2, ensure_ascii=False)
 
     print(f"\nFigura salva em: {png_path}")
-    print(f"Medidas salvas em: {json_path} (e {LAST_RESULT_PATH})")
+    print(f"Medidas salvas em: {json_path} (e {PI_DEMO_LAST_PATH})")
     print(f"Tempo: {time.time() - t0:.1f} s")
     if not args.sem_janela:
         plt.show()

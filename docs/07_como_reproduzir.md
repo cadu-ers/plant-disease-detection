@@ -51,7 +51,8 @@ O `run_ia.py` verifica antes se `data_processed/` e
 `data_split/split_manifest.csv` existem; se não existirem, para com a mensagem
 "Rode primeiro o bloco de Processamento de Imagens: python src/run_pi.py".
 
-A demonstração (`python src/demo.py`) continua separada dos orquestradores.
+As demonstrações (`python src/demo_pi.py` e `python src/demo_ia.py`) continuam
+separadas dos orquestradores.
 
 ## Demonstração do Processamento de Imagens (`demo_pi.py`)
 
@@ -100,6 +101,58 @@ Saídas em `rotina_demo/pi/`: `resultado_<timestamp>.png` (figura),
 `resultado_<timestamp>.json` (caminho, classe real, split e medidas) e
 `ultima.json` (cópia do último resultado, usada pelo `demo_ia --ultima-pi`).
 
+## Demonstração da IA (`demo_ia.py`)
+
+Mostra, em uma imagem, o bloco de IA usando o resultado do bloco de PI: a folha
+é segmentada com `segment_image`, classificada pela CNN (top 3) e pelo SVM
+híbrido (embedding da CNN + features clássicas), e as duas predições são
+comparadas com a classe real.
+
+```bash
+python src/demo_ia.py                              # imagem aleatória do TESTE (manifest)
+python src/demo_ia.py --classe Tomato_Early_blight # aleatória do teste dessa classe
+python src/demo_ia.py caminho/da/imagem.jpg        # imagem específica
+python src/demo_ia.py --ultima-pi                  # mesma imagem da última execução do demo_pi
+python src/demo_ia.py --seed 7                     # sorteio reprodutível
+python src/demo_ia.py --sem-janela                 # só salva, não abre janela
+python src/demo_ia.py --verbose                    # mostra os logs do TensorFlow
+```
+
+As opções podem ser combinadas (ex.: `--classe Tomato_Early_blight --seed 42
+--sem-janela`); só um entre caminho de imagem, `--classe` e `--ultima-pi` pode
+ser usado por vez. `--ultima-pi` lê `rotina_demo/pi/ultima.json` (se não
+existir: "rode antes python src/demo_pi.py"), o que permite mostrar em
+sequência, na mesma folha, o bloco de PI e o de IA:
+
+```bash
+python src/demo_pi.py --classe Tomato_Early_blight --seed 42
+python src/demo_ia.py --ultima-pi
+```
+
+Requisitos: o modelo da CNN (`models/plant_disease_model.keras` e
+`models/class_names.json`; se faltar, a mensagem pede para rodar
+`python src/run_ia.py`). Sem `models/svm_hybrid.joblib`, roda só a CNN e avisa.
+
+Como as predições são feitas:
+
+1. **CNN**: a entrada é igual à do treino. A imagem segmentada é codificada
+   como o `preprocessing.py` a grava em `data_processed/` e depois decodificada
+   e redimensionada para 160x160 como no `extract_features.py`.
+2. **SVM híbrido**: as 147 features clássicas (`features.py`, como no
+   `extract_features.py`) e o embedding da CNN (saída da
+   `GlobalAveragePooling2D`, 1280 dimensões) formam uma linha com as mesmas
+   colunas e a mesma ordem do treino (`h_hist_00` ... `cnn_1279`); o script
+   confere essas colunas contra as gravadas no `svm_hybrid.joblib`.
+
+Validação feita durante o desenvolvimento, em 26 imagens do teste (2 por
+classe): as predições da CNN e do SVM foram idênticas às obtidas a partir do
+`features_cache/` em 26/26 (diferença máxima de 2,7e-6 no softmax, 8,7e-6 no
+embedding e 1,4e-14 nas features clássicas).
+
+Saídas em `rotina_demo/ia/`: `resultado_<timestamp>.png` (original, folha
+segmentada, top 3 da CNN e quadro com classe real, predições, se concordam e
+se cada uma acertou) e `resultado_<timestamp>.txt` (os mesmos dados).
+
 ## Execução manual, script por script
 
 ```bash
@@ -110,7 +163,8 @@ python src/split_dataset.py
 python src/train_model.py
 python src/extract_features.py
 python src/hybrid_classifier.py
-python src/demo.py
+python src/demo_pi.py
+python src/demo_ia.py
 ```
 
 Material de processamento de imagens (figuras para a apresentação; usam o
@@ -163,8 +217,13 @@ docker compose run --rm app python src/split_dataset.py
 docker compose run --rm app python src/train_model.py
 docker compose run --rm app python src/extract_features.py
 docker compose run --rm app python src/hybrid_classifier.py
-docker compose run --rm app python src/demo.py
+docker compose run --rm app python src/demo_pi.py --sem-janela
+docker compose run --rm app python src/demo_ia.py --sem-janela
 ```
+
+Dentro do container não há tela: as demonstrações (`demo_pi.py` e `demo_ia.py`)
+precisam de `--sem-janela`. As figuras ficam em `rotina_demo/pi/` e
+`rotina_demo/ia/` no workspace.
 
 Os orquestradores também funcionam no container:
 
@@ -224,7 +283,7 @@ O `Dockerfile` instala só o `requirements.txt` (sem o `pytest`).
 │   ├── expert_system/      # sistema especialista: base de conhecimento (YAML), motor de inferência e diagnose.py
 │   │   # Demo e testes
 │   ├── demo_pi.py          # demonstração do Processamento de Imagens (segmentação, FFT, histogramas HSV)
-│   ├── demo.py             # rotina de demonstração (predição em uma imagem)
+│   ├── demo_ia.py          # demonstração da IA (CNN top 3 + SVM híbrido em uma imagem)
 │   └── tests/              # testes automatizados do sistema especialista (pytest)
 ├── requirements.txt        # dependências para rodar o projeto
 ├── requirements-dev.txt    # requirements.txt + pytest

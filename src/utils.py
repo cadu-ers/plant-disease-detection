@@ -5,6 +5,7 @@ confusão no padrão do projeto.
 Uso:
     from utils import list_classes, list_images, pick_random_image
     from utils import short_name, plot_confusion_matrix, slide_style
+    from utils import load_manifest, pick_test_image, describe_image
 
 Gera:
     nada (módulo de funções auxiliares)
@@ -16,7 +17,7 @@ import re
 
 import numpy as np
 
-from config import IMAGE_EXTENSIONS
+from config import DATA_DIR, IMAGE_EXTENSIONS, SPLIT_MANIFEST
 
 
 def list_classes(data_dir):
@@ -105,3 +106,49 @@ def slide_style():
         "savefig.dpi": 150,
         "savefig.bbox": "tight",
     })
+
+
+# ---------- Escolha da imagem das demos (demo_pi.py e demo_ia.py) ----------
+def load_manifest():
+    """Manifest do split (DataFrame) ou None se ainda não existir."""
+    import pandas as pd
+    return pd.read_csv(SPLIT_MANIFEST) if os.path.exists(SPLIT_MANIFEST) else None
+
+
+def pick_test_image(manifest, class_name=None, seed=None):
+    """Sorteia uma imagem do TESTE (opcionalmente de uma classe).
+
+    Retorna (caminho_original, classe, "test"). Lança ValueError com uma mensagem
+    pronta para o usuário se o manifest não existir ou a classe não for válida.
+    """
+    if manifest is None:
+        raise ValueError(f"{SPLIT_MANIFEST} não encontrado. Rode antes: python src/run_pi.py "
+                         "(ou informe o caminho de uma imagem)")
+    test = manifest[manifest["split"] == "test"]
+    if class_name:
+        if class_name not in set(test["class"]):
+            raise ValueError(f"Classe '{class_name}' não encontrada. Classes: "
+                             + ", ".join(sorted(test["class"].unique())))
+        test = test[test["class"] == class_name]
+    rows = test.sort_values(["class", "filename"])
+    row = rows.iloc[random.Random(seed).randrange(len(rows))]
+    return row["original_path"], row["class"], "test"
+
+
+def describe_image(path, manifest):
+    """Classe real e split de uma imagem informada: pelo manifest ou pela pasta da classe.
+
+    Retorna (classe ou None, split ou None). Lança ValueError se o arquivo não existir.
+    """
+    if not os.path.exists(path):
+        raise ValueError(f"Imagem não encontrada: {path}")
+    if manifest is not None:
+        target = os.path.normcase(os.path.abspath(path))
+        match = manifest[manifest["original_path"].map(
+            lambda p: os.path.normcase(os.path.abspath(p))) == target]
+        if len(match):
+            return match.iloc[0]["class"], match.iloc[0]["split"]
+    folder = os.path.basename(os.path.dirname(os.path.abspath(path)))
+    if os.path.isdir(DATA_DIR) and folder in list_classes(DATA_DIR):
+        return folder, None
+    return None, None
