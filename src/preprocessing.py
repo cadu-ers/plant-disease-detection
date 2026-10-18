@@ -33,6 +33,18 @@ IMG_SIZE = (224, 224)
 LOWER_GREEN = np.array([25, 40, 40])
 UPPER_GREEN = np.array([90, 255, 255])
 
+# Faixa de tons de lesão (manchas marrons/amarelas) em HSV.
+# As lesões das doenças têm matiz abaixo do verde (H ~8–35) e ficavam fora da
+# máscara de verde, virando "buracos" pretos.
+# S >= 40 segura o fundo bege/cinza do PlantVillage (baixa saturação, mas matiz
+# na faixa do marrom); com S menor o fundo passa e o contorno preenchido o engole.
+# V >= 20 recupera as lesões escuras na borda da folha, que falhavam com V >= 30.
+LOWER_LESION = np.array([8, 40, 20])
+UPPER_LESION = np.array([35, 255, 255])
+
+# Área mínima (fração da imagem) para aceitar o maior contorno como a folha.
+MIN_LEAF_AREA_RATIO = 0.05
+
 
 def load_and_resize(path, size=IMG_SIZE):
     """Etapa 1: leitura e redimensionamento."""
@@ -54,14 +66,47 @@ def to_hsv(img):
 
 
 def segment_leaf(img_bgr, img_hsv):
-    """Etapa 4: segmentação da folha via máscara de cor em HSV."""
-    mask = cv2.inRange(img_hsv, LOWER_GREEN, UPPER_GREEN)
-    # Limpeza morfológica da máscara (remove ruído pequeno, fecha buracos)
+    """Etapa 4: segmentação da folha (máscara verde + lesão, contorno externo preenchido)."""
+    # a) Máscara de verde unida à máscara de tons de lesão (marrom/amarelo)
+    green_mask = cv2.inRange(img_hsv, LOWER_GREEN, UPPER_GREEN)
+    lesion_mask = cv2.inRange(img_hsv, LOWER_LESION, UPPER_LESION)
+    mask = cv2.bitwise_or(green_mask, lesion_mask)
+
+    # b) Limpeza morfológica (abertura remove ruído pequeno, fechamento fecha buracos)
     kernel = np.ones((5, 5), np.uint8)
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+
+    # c) Mantém só o maior contorno externo (a folha) e preenche o interior,
+    #    para que tudo dentro da folha (lesões incluídas) entre na máscara
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    min_area = MIN_LEAF_AREA_RATIO * mask.shape[0] * mask.shape[1]
+    if contours:
+        largest = max(contours, key=cv2.contourArea)
+        # d) Fallback: se o maior contorno for pequeno demais, usa a máscara do passo b
+        if cv2.contourArea(largest) >= min_area:
+            filled = np.zeros_like(mask)
+            cv2.drawContours(filled, [largest], -1, 255, thickness=cv2.FILLED)
+            mask = filled
+
+    # e) Aplica a máscara na imagem
     segmented = cv2.bitwise_and(img_bgr, img_bgr, mask=mask)
     return segmented, mask
+
+
+def segment_image(path):
+    """Executa as etapas 1–4 em uma imagem e retorna (original, segmented, mask).
+
+    `original` é a imagem redimensionada, antes da suavização.
+    Retorna None se a imagem não puder ser lida.
+    """
+    original = load_and_resize(path)
+    if original is None:
+        return None
+    img = denoise(original)
+    img_hsv = to_hsv(img)
+    segmented, mask = segment_leaf(img, img_hsv)
+    return original, segmented, mask
 
 
 def extract_color_histogram(img_hsv, bins=8):

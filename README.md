@@ -28,19 +28,40 @@ seguintes etapas:
 3. **Suavização / remoção de ruído**: aplicação de um filtro Gaussian Blur
    (kernel 5x5), reduzindo ruídos de captura e pequenas imperfeições que
    poderiam atrapalhar a segmentação.
-4. **Segmentação da folha**: utiliza uma máscara de cor em HSV
-   (`cv2.inRange`) para isolar os tons de verde característicos da folha,
-   seguida de operações morfológicas (abertura e fechamento) para limpar
-   ruídos da máscara. O resultado é a folha isolada do fundo da imagem.
-   - **Limitação observada**: como a segmentação é baseada em uma faixa
-     fixa de cor, regiões da própria folha saudável com brilho, sombra ou
-     pequenos furos de inseto também podem ser removidas (aparecendo como
-     "buracos" pretos na imagem segmentada), mesmo sem indicar doença.
-     Optamos por manter essa abordagem por ser simples e eficiente,
-     mantendo esses "buracos" como uma limitação conhecida do método.
-     Na próxima entrega (P2), pretendemos aprimorar essa etapa utilizando
-     preenchimento de contornos (`cv2.fillPoly`) para manter apenas o
-     contorno externo da folha como máscara.
+4. **Segmentação da folha**: a máscara é a união (`cv2.bitwise_or`) de
+   duas faixas de cor em HSV (`cv2.inRange`): os tons de verde da folha e
+   os tons de lesão (manchas marrons/amarelas, H ~8–35). Em seguida, são
+   aplicadas operações morfológicas (abertura e fechamento) para limpar
+   ruídos. Por fim, com `cv2.findContours` mantemos apenas o maior
+   contorno externo (a folha) e o preenchemos por inteiro
+   (`cv2.drawContours` com `cv2.FILLED`), de modo que tudo o que está
+   dentro da folha entra na máscara e o fundo é removido. Se nenhum
+   contorno for encontrado ou se o maior ocupar menos de 5% da imagem,
+   usa-se a máscara de cor como fallback.
+   - **Motivo da mudança**: a versão anterior usava apenas a máscara de
+     verde, e as lesões das doenças (que não são verdes) ficavam fora
+     dela, virando "buracos" pretos na imagem segmentada — ou seja, o
+     sintoma da doença era justamente o que estava sendo apagado. A
+     comparação entre as duas abordagens pode ser gerada com
+     `python src/check_segmentation.py` (salva em
+     `reports/segmentation_comparison.png`).
+   - **Escolha dos limiares da máscara de lesão**: o matiz (H ~8–35) foi
+     fixado e testamos os mínimos de saturação (S) e brilho (V) nas mesmas
+     12 imagens (seed 42), com
+     `python src/check_segmentation.py --s <S> --v <V> --out <arquivo>`:
+
+     | S | V | Lesões na borda | Vazamento de fundo | Imagem |
+     |---|---|---|---|---|
+     | 40 | 30 | Lesões escuras da borda cortadas | Não | `reports/segmentation_S40_V30.png` |
+     | 25 | 20 | Recuperadas | Sim: o fundo bege/cinza tem matiz na faixa do marrom, e só a saturação separa os dois | `reports/segmentation_S25_V20.png` |
+     | **40** | **20** | **Recuperadas (escolhido)** | **Não** | `reports/segmentation_S40_V20.png` |
+     | 35 | 20 | Recuperadas | Sombra/fundo começam a entrar | `reports/segmentation_S35_V20.png` |
+
+   - **Limitação conhecida**: lesões de borda com saturação tão baixa
+     quanto a do fundo (ex.: o recorte em uma das imagens de
+     `Potato___Early_blight`) não são separáveis apenas por limiar de HSV.
+     Uma melhoria futura seria segmentar a folha com GrabCut ou com um
+     modelo de segmentação (ex.: U-Net).
 5. **Extração de features clássicas** (complementar): histograma de cor
    (H, S, V) e descritores de textura via matriz de co-ocorrência (GLCM) —
    contraste, homogeneidade, energia e correlação — salvos em

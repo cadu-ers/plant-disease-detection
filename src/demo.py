@@ -18,13 +18,14 @@ import cv2
 import matplotlib.pyplot as plt
 import tensorflow as tf
 
+# Permite importar módulos de src/ ao rodar "python src/demo.py" a partir da raiz
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from preprocessing import segment_image  # noqa: E402
+
 DATA_DIR = "data"
 MODEL_PATH = "models/plant_disease_model.keras"
 OUTPUT_DIR = "rotina_demo"
 IMG_SIZE = (160, 160)
-
-LOWER_GREEN = np.array([25, 40, 40])
-UPPER_GREEN = np.array([90, 255, 255])
 
 
 def pick_random_image():
@@ -36,22 +37,6 @@ def pick_random_image():
               if f.lower().endswith((".jpg", ".jpeg", ".png"))]
     img_name = random.choice(images)
     return os.path.join(class_dir, img_name), class_name
-
-
-def segment(path):
-    original = cv2.imread(path)
-    original = cv2.resize(original, (224, 224))
-
-    blurred = cv2.GaussianBlur(original, (5, 5), 0)
-    hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
-
-    mask = cv2.inRange(hsv, LOWER_GREEN, UPPER_GREEN)
-    kernel = np.ones((5, 5), np.uint8)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
-    segmented = cv2.bitwise_and(blurred, blurred, mask=mask)
-
-    return original, segmented
 
 
 def predict(model, segmented, class_names):
@@ -118,7 +103,11 @@ def main():
 
     model = tf.keras.models.load_model(MODEL_PATH)
 
-    original, segmented = segment(img_path)
+    result = segment_image(img_path)
+    if result is None:
+        print(f"Não foi possível ler a imagem: {img_path}")
+        sys.exit(1)
+    original, segmented, _ = result
     predicted_class, confidence, top3 = predict(model, segmented, class_names)
 
     print(f"Predição: {predicted_class} ({confidence:.1%})")
