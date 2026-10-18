@@ -1,0 +1,428 @@
+# =============================================================================
+# Base de conhecimento do sistema especialista (tomate e batata, PlantVillage)
+#
+# ATENÇÃO: este conteúdo é um PONTO DE PARTIDA, escrito a partir de conhecimento
+# geral de fitopatologia. Antes de apresentá-lo como fonte confiável:
+#   1) valide os sintomas, as regras e as recomendações com um agrônomo ou com
+#      literatura da área (ex.: Embrapa Hortaliças, material de extensão rural);
+#   2) calibre os trapézios e os CFs com os dados (distribuição das medidas por
+#      classe) e com a avaliação regras-só x CNN-só x híbrido.
+# As recomendações são orientações gerais de manejo, sem doses nem produtos.
+# =============================================================================
+
+config:
+  peso_cnn: 0.5            # CF da evidência da CNN = peso_cnn * probabilidade
+  limiar_ativacao: 0.3     # grau mínimo para uma regra disparar
+  limiar_conclusivo: 0.6   # CF mínimo do melhor diagnóstico para ser conclusivo
+  margem_minima: 0.15      # diferença mínima para o 2º colocado
+  limiar_exibicao: 0.2     # abaixo disso a hipótese não é apresentada como provável
+
+# -----------------------------------------------------------------------------
+# Sintomas. origem "imagem": vêm das máscaras (medida + trapézio [a, b, c, d]);
+# origem "usuario": só podem ser informados por quem olha a planta.
+# Todos têm "pergunta" para o modo interativo.
+# -----------------------------------------------------------------------------
+sintomas:
+  lesoes_marrom_escuro:
+    descricao: manchas marrom-escuras / necróticas
+    origem: imagem
+    medida: frac_marrom            # fração da área da folha com lesão marrom
+    trapezio: [0.01, 0.04, 1.0, 1.0]
+    pergunta: Há manchas marrom-escuras (tecido morto) na folha?
+  lesoes_grandes:
+    descricao: lesões extensas, cobrindo boa parte da folha
+    origem: imagem
+    medida: frac_lesao_total       # fração da área da folha com qualquer lesão
+    trapezio: [0.10, 0.25, 1.0, 1.0]
+    pergunta: As lesões são grandes, cobrindo boa parte da folha?
+  lesoes_pequenas_numerosas:
+    descricao: muitas manchas pequenas espalhadas
+    origem: imagem
+    medida: n_lesoes_pequenas      # nº de lesões pequenas
+    trapezio: [5, 15, 1000, 1000]
+    pergunta: A folha tem muitas manchas pequenas espalhadas?
+  lesoes_na_borda:
+    descricao: lesões concentradas na margem ou na ponta da folha
+    origem: imagem
+    medida: dist_borda_media_lesoes  # distância média à borda (0 = borda, 1 = centro)
+    trapezio: [0.0, 0.0, 0.25, 0.5]
+    pergunta: As manchas começam pela margem ou pela ponta da folha?
+  halo_amarelo:
+    descricao: halo amarelo ao redor das manchas
+    origem: imagem
+    medida: frac_lesoes_com_halo
+    trapezio: [0.2, 0.5, 1.0, 1.0]
+    pergunta: As manchas têm um halo amarelo ao redor?
+  amarelecimento_difuso:
+    descricao: amarelecimento generalizado ou entre as nervuras
+    origem: imagem
+    medida: frac_amarelo
+    trapezio: [0.05, 0.2, 1.0, 1.0]
+    pergunta: A folha está amarelando de forma generalizada (não só ao redor de manchas)?
+  aneis_concentricos:
+    descricao: manchas com anéis concêntricos (aspecto de alvo)
+    origem: usuario
+    pergunta: As manchas têm anéis concêntricos, como um alvo?
+  aspecto_encharcado:
+    descricao: manchas escuras com aspecto encharcado / oleoso
+    origem: usuario
+    pergunta: As manchas parecem encharcadas ou oleosas, escuras e brilhantes?
+  micelio_branco_inferior:
+    descricao: penugem esbranquiçada na face inferior, na borda das lesões
+    origem: usuario
+    pergunta: Na face de baixo da folha, há uma penugem esbranquiçada na borda das manchas?
+  mofo_face_inferior:
+    descricao: mofo aveludado verde-oliva a cinza na face inferior
+    origem: usuario
+    pergunta: Na face de baixo da folha há mofo aveludado verde-oliva ou acinzentado?
+  manchas_amarelo_palidas_superior:
+    descricao: manchas amarelo-pálidas na face superior
+    origem: usuario
+    pergunta: A face de cima tem manchas amarelo-pálidas, de contorno mal definido?
+  centro_cinza_pontos_pretos:
+    descricao: manchas com centro acinzentado e pontinhos pretos
+    origem: usuario
+    pergunta: As manchas têm o centro acinzentado com pontinhos pretos?
+  pontilhado_amarelo_fino:
+    descricao: pontilhado amarelo fino ou aspecto bronzeado
+    origem: usuario
+    pergunta: A folha tem um pontilhado amarelo bem fino ou aspecto bronzeado?
+  teia_fina:
+    descricao: teias finas na planta
+    origem: usuario
+    pergunta: Há teias muito finas na folha ou entre as folhas?
+  mosaico_claro_escuro:
+    descricao: mosqueado de áreas verde-claras e verde-escuras
+    origem: usuario
+    pergunta: A folha tem um mosqueado (mosaico) de verde claro e escuro?
+  folha_enrolada_cima:
+    descricao: folhas enroladas para cima
+    origem: usuario
+    pergunta: As folhas estão enroladas para cima?
+  folha_deformada:
+    descricao: folhas deformadas ou reduzidas
+    origem: usuario
+    pergunta: As folhas estão deformadas, estreitas ou menores que o normal?
+  folhas_velhas_primeiro:
+    descricao: sintomas começam pelas folhas mais velhas (de baixo)
+    origem: usuario
+    pergunta: Os sintomas começaram pelas folhas mais velhas, de baixo da planta?
+  umidade_alta:
+    descricao: ambiente úmido (chuvas frequentes, orvalho, estufa abafada)
+    origem: usuario
+    pergunta: O ambiente está úmido (chuvas frequentes, orvalho ou estufa pouco ventilada)?
+  clima_quente_seco:
+    descricao: período quente e seco
+    origem: usuario
+    pergunta: O período recente foi quente e seco?
+
+# -----------------------------------------------------------------------------
+# Doenças / classes (as 13 do dataset). Chaves canônicas: ver classes.py.
+# -----------------------------------------------------------------------------
+doencas:
+  tomate_early_blight:
+    nome: Pinta-preta do tomateiro (Early blight)
+    cultura: tomate
+    agente: Alternaria solani (fungo)
+    urgencia: media
+    confundivel_com: [tomate_target_spot, tomate_septoria]
+    recomendacoes:
+      - Remover e descartar as folhas mais afetadas, começando pelas de baixo.
+      - Evitar molhar a folhagem na irrigação e favorecer a ventilação entre plantas.
+      - Fazer rotação de culturas e eliminar restos culturais ao fim do ciclo.
+      - Procurar orientação técnica sobre produtos registrados para a cultura.
+  batata_early_blight:
+    nome: Pinta-preta da batata (Early blight)
+    cultura: batata
+    agente: Alternaria solani (fungo)
+    urgencia: media
+    confundivel_com: [batata_late_blight]
+    recomendacoes:
+      - Remover folhas muito afetadas e eliminar restos culturais.
+      - Evitar excesso de umidade na folhagem e manter a adubação equilibrada.
+      - Fazer rotação de culturas e usar batata-semente sadia.
+      - Procurar orientação técnica sobre produtos registrados para a cultura.
+  tomate_late_blight:
+    nome: Requeima do tomateiro (Late blight)
+    cultura: tomate
+    agente: Phytophthora infestans (oomiceto)
+    urgencia: alta
+    confundivel_com: [tomate_early_blight]
+    recomendacoes:
+      - Agir rápido, pois a doença se espalha depressa em clima frio e úmido.
+      - Remover e destruir plantas ou partes muito afetadas, sem compostar.
+      - Evitar irrigação por aspersão e reduzir o tempo de folha molhada.
+      - Procurar imediatamente orientação técnica sobre manejo e produtos registrados.
+  batata_late_blight:
+    nome: Requeima da batata (Late blight)
+    cultura: batata
+    agente: Phytophthora infestans (oomiceto)
+    urgencia: alta
+    confundivel_com: [batata_early_blight]
+    recomendacoes:
+      - Agir rápido, pois a doença se espalha depressa em clima frio e úmido.
+      - Remover e destruir plantas ou partes muito afetadas, sem compostar.
+      - Evitar irrigação por aspersão e usar batata-semente sadia.
+      - Procurar imediatamente orientação técnica sobre manejo e produtos registrados.
+  tomate_bacterial_spot:
+    nome: Mancha-bacteriana do tomateiro (Bacterial spot)
+    cultura: tomate
+    agente: Xanthomonas spp. (bactéria)
+    urgencia: media
+    confundivel_com: [tomate_septoria]
+    recomendacoes:
+      - Usar sementes e mudas sadias e evitar trabalhar na lavoura com a folhagem molhada.
+      - Remover plantas muito afetadas e fazer rotação de culturas.
+      - Evitar irrigação por aspersão.
+      - Procurar orientação técnica, pois o controle químico de bactérias é limitado.
+  tomate_septoria:
+    nome: Septoriose do tomateiro (Septoria leaf spot)
+    cultura: tomate
+    agente: Septoria lycopersici (fungo)
+    urgencia: media
+    confundivel_com: [tomate_bacterial_spot, tomate_early_blight]
+    recomendacoes:
+      - Remover folhas baixeiras afetadas e restos culturais.
+      - Evitar molhar a folhagem e melhorar a ventilação.
+      - Fazer rotação de culturas.
+      - Procurar orientação técnica sobre produtos registrados para a cultura.
+  tomate_leaf_mold:
+    nome: Mofo-da-folha do tomateiro (Leaf mold)
+    cultura: tomate
+    agente: Passalora fulva (fungo)
+    urgencia: media
+    confundivel_com: []
+    recomendacoes:
+      - Reduzir a umidade do ambiente e melhorar a ventilação (principalmente em estufa).
+      - Evitar molhar a folhagem e remover folhas muito afetadas.
+      - Procurar orientação técnica sobre variedades resistentes e produtos registrados.
+  tomate_spider_mites:
+    nome: Ácaro-rajado (Two-spotted spider mite)
+    cultura: tomate
+    agente: Tetranychus urticae (ácaro)
+    urgencia: media
+    confundivel_com: []
+    recomendacoes:
+      - Examinar a face inferior das folhas, de preferência com lupa.
+      - Evitar estresse hídrico e excesso de poeira na lavoura.
+      - Procurar orientação técnica sobre controle (inclusive biológico) e produtos registrados.
+  tomate_target_spot:
+    nome: Mancha-alvo do tomateiro (Target spot)
+    cultura: tomate
+    agente: Corynespora cassiicola (fungo)
+    urgencia: media
+    confundivel_com: [tomate_early_blight]
+    recomendacoes:
+      - Remover folhas afetadas e eliminar restos culturais.
+      - Melhorar a ventilação e evitar molhar a folhagem.
+      - Procurar orientação técnica sobre produtos registrados para a cultura.
+  tomate_yellow_leaf_curl:
+    nome: Vírus do enrolamento amarelo da folha do tomateiro (TYLCV)
+    cultura: tomate
+    agente: Begomovirus transmitido por mosca-branca (Bemisia tabaci)
+    urgencia: alta
+    confundivel_com: [tomate_mosaic]
+    recomendacoes:
+      - Não há cura: remover e destruir plantas infectadas para reduzir a fonte do vírus.
+      - Controlar a mosca-branca (mudas sadias, telas, manejo do vetor).
+      - Procurar orientação técnica sobre variedades tolerantes e manejo do vetor.
+  tomate_mosaic:
+    nome: Vírus do mosaico do tomateiro (ToMV)
+    cultura: tomate
+    agente: Tobamovirus (vírus, transmissão mecânica e por sementes)
+    urgencia: alta
+    confundivel_com: [tomate_yellow_leaf_curl]
+    recomendacoes:
+      - Não há cura: remover e destruir plantas infectadas.
+      - Higienizar mãos e ferramentas e usar sementes certificadas.
+      - Procurar orientação técnica sobre variedades resistentes.
+  tomate_saudavel:
+    nome: Tomateiro saudável
+    cultura: tomate
+    agente: ""
+    urgencia: baixa
+    confundivel_com: []
+    recomendacoes:
+      - Manter o monitoramento regular da lavoura.
+  batata_saudavel:
+    nome: Batateira saudável
+    cultura: batata
+    agente: ""
+    urgencia: baixa
+    confundivel_com: []
+    recomendacoes:
+      - Manter o monitoramento regular da lavoura.
+
+# -----------------------------------------------------------------------------
+# Regras SE ... ENTÃO ...
+#   se:      sintomas que precisam estar presentes (E fuzzy = mínimo dos graus)
+#   se_nao:  sintomas que precisam estar ausentes (grau = 1 - valor do sintoma)
+#   entao:   hipóteses afetadas e o CF da regra (-1 a 1; negativo = evidência contra)
+#   porque:  texto usado na explicação ao usuário
+# Sintoma desconhecido (nunca informado) impede a regra de disparar: "não sei"
+# é diferente de "ausente" (0).
+# -----------------------------------------------------------------------------
+regras:
+  # --- Pinta-preta (Early blight) ---
+  - id: R01
+    se: [lesoes_marrom_escuro, aneis_concentricos]
+    entao: {hipoteses: [tomate_early_blight, batata_early_blight], cf: 0.7}
+    porque: Manchas marrons com anéis concêntricos (aspecto de alvo) são o sinal clássico da pinta-preta.
+  - id: R02
+    se: [lesoes_marrom_escuro, halo_amarelo, folhas_velhas_primeiro]
+    entao: {hipoteses: [tomate_early_blight, batata_early_blight], cf: 0.5}
+    porque: Manchas escuras com halo amarelo que começam nas folhas mais velhas são típicas da pinta-preta.
+  - id: R03
+    se: [lesoes_marrom_escuro, halo_amarelo]
+    entao: {hipoteses: [tomate_early_blight, batata_early_blight], cf: 0.3}
+    porque: Manchas escuras com halo amarelo são compatíveis com a pinta-preta (sinal fraco, também ocorre em outras doenças).
+  - id: R04
+    se: [lesoes_marrom_escuro, aneis_concentricos, folhas_velhas_primeiro]
+    entao: {hipoteses: [tomate_early_blight, batata_early_blight], cf: 0.3}
+    porque: A pinta-preta costuma começar pelas folhas mais velhas.
+
+  # --- Mancha-alvo (Target spot) ---
+  - id: R05
+    se: [lesoes_marrom_escuro, aneis_concentricos]
+    entao: {hipoteses: [tomate_target_spot], cf: 0.4}
+    porque: Manchas marrons com anéis concêntricos também são típicas da mancha-alvo (difícil de separar da pinta-preta só pela imagem).
+
+  # --- Requeima (Late blight) ---
+  - id: R07
+    se: [aspecto_encharcado, lesoes_grandes]
+    entao: {hipoteses: [tomate_late_blight, batata_late_blight], cf: 0.6}
+    porque: Lesões grandes com aspecto encharcado indicam requeima.
+  - id: R08
+    se: [micelio_branco_inferior, aspecto_encharcado]
+    entao: {hipoteses: [tomate_late_blight, batata_late_blight], cf: 0.8}
+    porque: Penugem esbranquiçada na face inferior junto a lesões encharcadas é muito característica da requeima.
+  - id: R09
+    se: [lesoes_grandes, lesoes_na_borda]
+    entao: {hipoteses: [tomate_late_blight, batata_late_blight], cf: 0.3}
+    porque: A requeima costuma avançar a partir da margem e da ponta da folha.
+  - id: R10
+    se: [lesoes_grandes, umidade_alta]
+    entao: {hipoteses: [tomate_late_blight, batata_late_blight], cf: 0.3}
+    porque: A requeima é favorecida por umidade alta.
+  - id: R11
+    se: [aneis_concentricos]
+    entao: {hipoteses: [tomate_late_blight, batata_late_blight], cf: -0.3}
+    porque: Anéis concêntricos não são típicos da requeima.
+  - id: R12
+    se: [lesoes_pequenas_numerosas]
+    entao: {hipoteses: [tomate_late_blight, batata_late_blight], cf: -0.3}
+    porque: A requeima forma lesões grandes, e não muitas manchas pequenas.
+
+  # --- Mancha-bacteriana (Bacterial spot) ---
+  - id: R13
+    se: [lesoes_pequenas_numerosas, lesoes_marrom_escuro, halo_amarelo]
+    entao: {hipoteses: [tomate_bacterial_spot], cf: 0.55}
+    porque: Muitas manchas pequenas escuras com halo amarelo são típicas da mancha-bacteriana.
+  - id: R14
+    se: [lesoes_pequenas_numerosas, aspecto_encharcado]
+    entao: {hipoteses: [tomate_bacterial_spot], cf: 0.35}
+    porque: Manchas pequenas de aspecto encharcado/oleoso sugerem mancha-bacteriana.
+  - id: R15
+    se: [aneis_concentricos]
+    entao: {hipoteses: [tomate_bacterial_spot], cf: -0.3}
+    porque: Anéis concêntricos não são típicos da mancha-bacteriana.
+
+  # --- Septoriose ---
+  - id: R16
+    se: [lesoes_pequenas_numerosas, centro_cinza_pontos_pretos]
+    entao: {hipoteses: [tomate_septoria], cf: 0.85}
+    porque: Manchas pequenas com centro acinzentado e pontinhos pretos são o sinal característico da septoriose.
+  - id: R17
+    se: [lesoes_pequenas_numerosas, folhas_velhas_primeiro, umidade_alta]
+    entao: {hipoteses: [tomate_septoria], cf: 0.35}
+    porque: A septoriose começa nas folhas mais velhas e é favorecida por umidade.
+  - id: R18
+    se: [lesoes_pequenas_numerosas, lesoes_marrom_escuro]
+    entao: {hipoteses: [tomate_septoria], cf: 0.2}
+    porque: Muitas manchas pequenas escuras são compatíveis com septoriose (sinal fraco).
+  - id: R19
+    se: [lesoes_grandes]
+    entao: {hipoteses: [tomate_septoria], cf: -0.3}
+    porque: A septoriose forma manchas pequenas, e não lesões extensas.
+
+  # --- Mofo-da-folha (Leaf mold) ---
+  - id: R20
+    se: [mofo_face_inferior]
+    entao: {hipoteses: [tomate_leaf_mold], cf: 0.8}
+    porque: Mofo aveludado verde-oliva na face inferior é o sinal característico do mofo-da-folha.
+  - id: R21
+    se: [manchas_amarelo_palidas_superior, mofo_face_inferior]
+    entao: {hipoteses: [tomate_leaf_mold], cf: 0.5}
+    porque: Manchas amarelo-pálidas em cima combinadas com mofo embaixo confirmam o mofo-da-folha.
+  - id: R22
+    se: [manchas_amarelo_palidas_superior, umidade_alta]
+    entao: {hipoteses: [tomate_leaf_mold], cf: 0.3}
+    porque: Manchas amarelo-pálidas na face superior em ambiente úmido sugerem mofo-da-folha.
+
+  # --- Ácaro-rajado ---
+  - id: R23
+    se: [teia_fina]
+    entao: {hipoteses: [tomate_spider_mites], cf: 0.85}
+    porque: Teias finas são o sinal característico de ácaros.
+  - id: R24
+    se: [pontilhado_amarelo_fino, clima_quente_seco]
+    entao: {hipoteses: [tomate_spider_mites], cf: 0.6}
+    porque: Pontilhado amarelo fino em clima quente e seco sugere ataque de ácaros.
+  - id: R25
+    se: [pontilhado_amarelo_fino]
+    entao: {hipoteses: [tomate_spider_mites], cf: 0.4}
+    porque: O pontilhado amarelo fino ou bronzeado é causado pela alimentação dos ácaros.
+
+  # --- Enrolamento amarelo (TYLCV) ---
+  - id: R26
+    se: [folha_enrolada_cima, amarelecimento_difuso]
+    entao: {hipoteses: [tomate_yellow_leaf_curl], cf: 0.8}
+    porque: Folhas enroladas para cima com amarelecimento são típicas do vírus do enrolamento amarelo.
+  - id: R27
+    se: [folha_enrolada_cima]
+    entao: {hipoteses: [tomate_yellow_leaf_curl], cf: 0.5}
+    porque: O enrolamento das folhas para cima é um sintoma característico do TYLCV.
+  - id: R28
+    se: [amarelecimento_difuso, folha_deformada]
+    entao: {hipoteses: [tomate_yellow_leaf_curl], cf: 0.3}
+    porque: Amarelecimento com folhas reduzidas é compatível com o TYLCV.
+  - id: R29
+    se: [lesoes_marrom_escuro]
+    entao: {hipoteses: [tomate_yellow_leaf_curl, tomate_mosaic], cf: -0.3}
+    porque: Viroses não costumam causar manchas necróticas marrons como sintoma principal.
+
+  # --- Mosaico (ToMV) ---
+  - id: R30
+    se: [mosaico_claro_escuro]
+    entao: {hipoteses: [tomate_mosaic], cf: 0.8}
+    porque: O mosqueado de verde claro e escuro é o sintoma característico do mosaico.
+  - id: R31
+    se: [mosaico_claro_escuro, folha_deformada]
+    entao: {hipoteses: [tomate_mosaic], cf: 0.5}
+    porque: Mosqueado com folhas deformadas reforça o diagnóstico de mosaico.
+  - id: R32
+    se: [folha_deformada]
+    entao: {hipoteses: [tomate_mosaic], cf: 0.25}
+    porque: Folhas deformadas são compatíveis com mosaico (sinal fraco).
+
+  # --- Saudável ---
+  - id: R33
+    se_nao: [lesoes_marrom_escuro, amarelecimento_difuso, lesoes_pequenas_numerosas, lesoes_grandes, halo_amarelo]
+    entao: {hipoteses: [tomate_saudavel, batata_saudavel], cf: 0.65}
+    porque: Nenhuma lesão, amarelecimento ou halo foi detectado na imagem.
+  - id: R34
+    se: [lesoes_marrom_escuro]
+    entao: {hipoteses: [tomate_saudavel, batata_saudavel], cf: -0.8}
+    porque: Há manchas marrons, o que é incompatível com folha saudável.
+  - id: R35
+    se: [amarelecimento_difuso]
+    entao: {hipoteses: [tomate_saudavel, batata_saudavel], cf: -0.6}
+    porque: O amarelecimento é incompatível com folha saudável.
+  - id: R36
+    se: [lesoes_pequenas_numerosas]
+    entao: {hipoteses: [tomate_saudavel, batata_saudavel], cf: -0.6}
+    porque: Muitas manchas pequenas são incompatíveis com folha saudável.
+  - id: R37
+    se_nao: [mosaico_claro_escuro, folha_enrolada_cima, pontilhado_amarelo_fino, teia_fina]
+    entao: {hipoteses: [tomate_saudavel, batata_saudavel], cf: 0.3}
+    porque: Também foram descartados mosaico, enrolamento, pontilhado e teias, que não aparecem como manchas.

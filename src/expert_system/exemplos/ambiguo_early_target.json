@@ -1,0 +1,6 @@
+{
+  "cultura": "tomate",
+  "medidas": {"frac_marrom": 0.12, "frac_lesao_total": 0.12, "frac_lesoes_com_halo": 0.6,
+              "frac_amarelo": 0.0, "n_lesoes_pequenas": 2, "dist_borda_media_lesoes": 0.6},
+  "cnn_prior": {"Tomato_Early_blight": 0.5, "Tomato__Target_Spot": 0.4}
+}

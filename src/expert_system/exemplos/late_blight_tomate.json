@@ -1,0 +1,5 @@
+{
+  "cultura": "tomate",
+  "sintomas": {"aspecto_encharcado": 1.0, "lesoes_grandes": 0.9, "umidade_alta": 1.0},
+  "cnn_prior": {"Tomato_Late_blight": 0.7, "Tomato_Early_blight": 0.2}
+}

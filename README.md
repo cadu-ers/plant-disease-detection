@@ -145,12 +145,14 @@ Utilizamos um subconjunto do dataset, com as classes de **tomate** e
 │   ├── utils.py            # funções auxiliares para listar classes/imagens e sortear uma imagem
 │   ├── download_dataset.py # baixa o PlantVillage e copia as classes de tomate/batata para data/
 │   ├── preprocessing.py    # pipeline de processamento de imagens (segmentação -> data_processed/)
-│   ├── features.py         # extração de features clássicas (cor + textura) para o classificador híbrido
+│   ├── features.py         # extração de features clássicas para análise e futura integração híbrida
 │   ├── check_segmentation.py  # compara a máscara antiga e a nova (reports/segmentation_*.png)
-│   ├── model_utils.py      # arquitetura do modelo (compartilhada entre treino e demo)
+│   ├── model_utils.py      # arquitetura do modelo usada durante o treinamento
 │   ├── train_model.py      # treino do modelo de IA
 │   ├── demo.py             # rotina de demonstração (predição em uma imagem)
-│   └── histogram_analysis.py  # script de documentação (histograma antes/depois da normalização)
+│   ├── histogram_analysis.py  # script de documentação (histograma antes/depois da normalização)
+│   ├── expert_system/      # base de conhecimento e motor de inferência
+│   └── tests/              # testes automatizados do sistema especialista
 ├── requirements.txt
 └── README.md
 ```
@@ -182,3 +184,54 @@ docker compose run --rm app python src/preprocessing.py
 docker compose run --rm app python src/train_model.py
 docker compose run --rm app python src/demo.py
 ```
+
+## Sistema especialista
+
+O projeto também possui um sistema especialista em `src/expert_system/`.
+Ele recebe fatos sobre a planta e aplica regras do tipo **SE... ENTÃO...**
+para ranquear doenças, calcular fatores de certeza e explicar o resultado.
+
+A base de conhecimento está em `src/expert_system/knowledge_base.yaml` e
+contém os sintomas, as 13 doenças, as regras, os fatores de certeza e as
+recomendações gerais. O motor também pode receber probabilidades produzidas
+pela CNN por meio do campo `cnn_prior`.
+
+### Executar um diagnóstico de exemplo
+
+Na raiz do projeto, execute:
+
+```bash
+python src/expert_system/diagnose.py src/expert_system/exemplos/late_blight_tomate.json
+```
+
+Para executar sem utilizar a evidência da CNN:
+
+```bash
+python src/expert_system/diagnose.py src/expert_system/exemplos/late_blight_tomate.json --sem-cnn
+```
+
+Para utilizar o modo interativo:
+
+```bash
+python src/expert_system/diagnose.py src/expert_system/exemplos/ambiguo_early_target.json --interativo
+```
+
+O resultado apresenta a hipótese principal, as evidências das regras, as
+hipóteses alternativas, os sintomas pendentes e recomendações gerais. O
+valor exibido como **CF** é um fator de certeza do sistema, não uma
+probabilidade estatística calibrada.
+
+Atualmente, o sistema especialista pode ser executado de forma independente
+com fatos informados em JSON. A integração automática entre imagem,
+segmentação, extração de medidas, CNN e sistema especialista é uma etapa
+futura do projeto.
+
+### Executar os testes
+
+```bash
+python -m pytest -q
+```
+
+Os testes cobrem o carregamento da base de conhecimento, o mapeamento das
+classes, o cálculo dos fatores de certeza, as regras de diagnóstico, as
+explicações e o modo interativo.

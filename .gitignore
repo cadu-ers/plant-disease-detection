@@ -12,6 +12,7 @@ features.csv
 
 # Python
 __pycache__/
+.pytest_cache/
 *.pyc
 *.pyo
 .ipynb_checkpoints/
