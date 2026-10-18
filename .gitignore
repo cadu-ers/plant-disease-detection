@@ -3,12 +3,10 @@ data/*
 !data/.gitkeep
 data_processed/
 data_split/
+features_cache/
 
 # Resultados de testes locais da rotina de demonstração
 rotina_demo/
-
-# Features geradas
-features.csv
 
 # Python
 __pycache__/

@@ -21,11 +21,20 @@ MODELS_DIR = "models"                # modelos treinados
 REPORTS_DIR = "reports"              # gráficos e relatórios
 SEGMENTATION_REPORTS_DIR = os.path.join(REPORTS_DIR, "segmentation")  # comparações de segmentação
 CNN_REPORTS_DIR = os.path.join(REPORTS_DIR, "cnn")                    # saídas do train_model.py
+HYBRID_REPORTS_DIR = os.path.join(REPORTS_DIR, "hybrid")              # saídas do hybrid_classifier.py
 DEMO_DIR = "rotina_demo"             # saídas da rotina de demonstração
+FEATURES_DIR = "features_cache"      # features extraídas (handcrafted + embeddings da CNN)
 
 MODEL_PATH = os.path.join(MODELS_DIR, "plant_disease_model.keras")
 # Ordem das classes usada no treino (índice de saída do modelo -> nome da classe)
 CLASS_NAMES_PATH = os.path.join(MODELS_DIR, "class_names.json")
+# Melhor pipeline do classificador híbrido (CNN + features clássicas -> SVM)
+HYBRID_MODEL_PATH = os.path.join(MODELS_DIR, "svm_hybrid.joblib")
+
+# Arquivos gerados por extract_features.py (na mesma ordem do SPLIT_MANIFEST)
+HANDCRAFTED_PATH = os.path.join(FEATURES_DIR, "handcrafted.csv")
+CNN_EMBEDDINGS_PATH = os.path.join(FEATURES_DIR, "cnn_embeddings.npz")
+CNN_TEST_PRED_PATH = os.path.join(FEATURES_DIR, "cnn_test_pred.npy")
 
 # ---------- Divisão treino/validação/teste ----------
 # Proporções (treino, validação, teste), estratificadas por classe.

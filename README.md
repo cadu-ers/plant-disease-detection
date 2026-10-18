@@ -63,10 +63,10 @@ processamento de imagens segue as etapas abaixo (1 a 4 em
      Uma melhoria futura seria segmentar a folha com GrabCut ou com um
      modelo de segmentação (ex.: U-Net).
 5. **Extração de features clássicas** (complementar, em `src/features.py`):
-   histograma de cor (H, S, V) e descritores de textura via matriz de
-   co-ocorrência (GLCM) — contraste, homogeneidade, energia e correlação.
-   Essa etapa foi separada do `preprocessing.py` (que agora só segmenta) e
-   será usada pelo classificador híbrido (features clássicas + CNN).
+   147 descritores de cor, proporção de lesão e textura (GLCM e LBP),
+   calculados só nos pixels da folha (máscara da segmentação). Essa etapa
+   foi separada do `preprocessing.py` (que só segmenta) e é usada pelo
+   classificador híbrido (ver seção "Classificador híbrido" abaixo).
 
 ## Descrição detalhada da integração com IA — Pipeline completo
 
@@ -134,6 +134,84 @@ doenças compartilham padrões de manchas parecidos.
 O gráfico de acurácia por época e o relatório completo de métricas
 (precision/recall/F1 por classe) estão disponíveis em `reports/`.
 
+## Classificador híbrido (CNN + features clássicas + SVM)
+
+Além da CNN, o projeto treina um classificador **SVM** que combina dois tipos
+de informação: os **embeddings** aprendidos pela CNN e **features clássicas**
+de processamento de imagens. Ele é comparado com a própria CNN no mesmo
+conjunto de teste.
+
+```
+split fixo (data_split/split_manifest.csv: treino / validação / teste)
+   │
+   ├─ imagem original ──→ segmentação (segment_image) ──→ features clássicas da folha (147)
+   │                                                        → StandardScaler ─────────────┐
+   │                                                                                      ├─→ SVM (RBF) → classe
+   └─ imagem segmentada ─→ CNN treinada ─→ embedding GAP (1280)                            │
+                                            → StandardScaler → PCA (64/128/256) ──────────┘
+```
+
+Implementação: `src/features.py` (features), `src/extract_features.py`
+(extrai e salva tudo em `features_cache/`) e `src/hybrid_classifier.py`
+(treino, avaliação e comparativo).
+
+**Features clássicas** (todas calculadas só nos pixels da folha, usando a
+máscara da segmentação):
+
+| Grupo | Nº | O que captura |
+|---|---|---|
+| Cor: histogramas H (32 bins), S (16), V (16) | 64 | distribuição de matiz, saturação e brilho da folha (amarelamento, manchas, palidez) |
+| Cor: momentos (média, desvio, assimetria) em HSV e Lab | 18 | cor média da folha e quão espalhada/assimétrica ela é |
+| Proporção de lesão | 1 | fração da folha nos tons de lesão (`LOWER_LESION`/`UPPER_LESION`): quanto da folha está manchada |
+| Textura GLCM (32 níveis; distâncias 1, 2, 3; 0°/45°/90°/135°) | 36 | contraste, dissimilaridade, homogeneidade, energia, correlação e ASM; média e desvio entre os ângulos (invariante à rotação) |
+| Textura LBP uniforme (P=8, R=1) e (P=16, R=2) | 28 | micro-padrões de textura (pontos, bordas, manchas finas) em duas escalas |
+
+No GLCM, o fundo é codificado como nível 0 e a linha/coluna 0 da matriz é
+descartada antes de calcular as propriedades, para que só pares de pixels da
+folha contem.
+
+Três SVMs são comparados com a CNN:
+
+| Modelo | Entrada |
+|---|---|
+| `SVM_classicas` | só features clássicas |
+| `SVM_cnn` | só embeddings da CNN (com PCA) |
+| `SVM_hibrido` | embeddings (com PCA) + features clássicas |
+| `CNN` | softmax da própria CNN (referência) |
+
+Decisões de projeto:
+
+- **Por que SVM com kernel RBF**: funciona bem com algumas centenas de
+  features densas e padronizadas, separa as classes de forma não linear e,
+  com `class_weight="balanced"`, compensa o desbalanceamento entre as classes.
+- **Por que PCA no bloco da CNN**: os embeddings têm 1280 dimensões e as
+  features clássicas, 147. Sem redução, a distância do kernel RBF seria
+  dominada pelos embeddings e as features clássicas quase não pesariam. A PCA
+  equilibra os dois blocos.
+- **Por que escolher os hiperparâmetros na validação**: a CNN foi treinada
+  nas imagens de treino, então os embeddings do treino ficam "fáceis demais".
+  Uma validação cruzada dentro do treino superestimaria todos os candidatos e
+  enviesaria a escolha. Por isso, o `GridSearchCV` usa um `PredefinedSplit`:
+  ajusta no treino, mede o F1-macro na validação e, com os melhores
+  hiperparâmetros (C, gamma e nº de componentes da PCA), reajusta em
+  treino + validação. **O teste nunca é usado para treinar nem para escolher
+  hiperparâmetros.**
+- **Teste de McNemar**: compara dois classificadores nas mesmas imagens de
+  teste, olhando só os casos em que eles discordam (um acerta e o outro erra).
+  Se a diferença fosse acaso, esses casos se dividiriam meio a meio; o teste
+  binomial exato dá o p-valor (p < 0,05 indica diferença estatisticamente
+  significativa). É aplicado entre `CNN` e `SVM_hibrido` e entre `SVM_cnn` e
+  `SVM_hibrido`.
+
+Saídas em `reports/hybrid/`: métricas e relatório por classe de cada modelo,
+resultados do grid search, matriz de confusão do `SVM_hibrido`,
+`comparativo.csv`/`comparativo.png` e `mcnemar.txt`. O melhor pipeline
+híbrido fica em `models/svm_hybrid.joblib`.
+
+### Resultados do classificador híbrido
+
+Resultados: (preencher após rodar)
+
 ## Requisitos
 
 As dependências do projeto estão listadas em [`requirements.txt`](./requirements.txt).
@@ -161,23 +239,28 @@ Utilizamos um subconjunto do dataset, com as classes de **tomate** e
 ```
 .
 ├── data/                  # implementar o dataset nessa pasta!
+├── features_cache/        # features clássicas + embeddings da CNN (extract_features.py, não versionado)
 ├── models/
 │   ├── plant_disease_model.keras  # modelo atual (gerado por train_model.py, não versionado)
 │   ├── class_names.json    # ordem das classes usada no treino
+│   ├── svm_hybrid.joblib   # melhor pipeline do classificador híbrido (hybrid_classifier.py)
 │   └── baseline_v1/        # modelo antigo, antes das correções (não versionado)
 ├── reports/
 │   ├── baseline_v1/        # relatórios do modelo antigo + README explicando o que mudou
 │   ├── cnn/                # saídas do train_model.py (relatório, matriz de confusão, métricas, histórico)
+│   ├── hybrid/             # saídas do hybrid_classifier.py (métricas, comparativo, McNemar)
 │   ├── segmentation/       # comparações de segmentação (check_segmentation.py)
 │   ├── split_summary.csv   # contagem de imagens por classe x split
 │   └── histograma_exemplo.png  # saída do histogram_analysis.py
 ├── src/
 │   ├── config.py           # constantes compartilhadas (caminhos, tamanhos, seed, limiares HSV)
-│   ├── utils.py            # funções auxiliares para listar classes/imagens e sortear uma imagem
+│   ├── utils.py            # funções auxiliares (listar classes/imagens, sortear imagem, matriz de confusão)
 │   ├── download_dataset.py # baixa o PlantVillage e copia as classes de tomate/batata para data/
 │   ├── preprocessing.py    # pipeline de processamento de imagens (segmentação -> data_processed/)
 │   ├── split_dataset.py    # divisão estratificada treino/val/teste (70/15/15) -> data_split/ + manifest
-│   ├── features.py         # extração de features clássicas (cor + textura) para o classificador híbrido
+│   ├── features.py         # features clássicas da folha (cor, lesão, GLCM, LBP) para o classificador híbrido
+│   ├── extract_features.py # extrai features clássicas + embeddings da CNN -> features_cache/
+│   ├── hybrid_classifier.py  # SVMs (clássicas / CNN / híbrido) x CNN no teste + McNemar
 │   ├── check_segmentation.py  # compara a máscara antiga e a nova (reports/segmentation/)
 │   ├── model_utils.py      # arquitetura do modelo (augmentation + MobileNetV2 + cabeça)
 │   ├── train_model.py      # treino do modelo de IA
@@ -195,8 +278,14 @@ python src/download_dataset.py
 python src/preprocessing.py
 python src/split_dataset.py
 python src/train_model.py
+python src/extract_features.py
+python src/hybrid_classifier.py
 python src/demo.py
 ```
+
+Para um teste rápido do classificador híbrido (poucas imagens e grade
+reduzida): `python src/extract_features.py --limit 5` seguido de
+`python src/hybrid_classifier.py --quick`.
 
 ## Docker
 
@@ -214,5 +303,7 @@ docker compose run --rm app python src/download_dataset.py
 docker compose run --rm app python src/preprocessing.py
 docker compose run --rm app python src/split_dataset.py
 docker compose run --rm app python src/train_model.py
+docker compose run --rm app python src/extract_features.py
+docker compose run --rm app python src/hybrid_classifier.py
 docker compose run --rm app python src/demo.py
 ```

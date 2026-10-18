@@ -7,7 +7,7 @@ __pycache__/
 data/
 data_processed/
 data_split/
+features_cache/
 models/
 rotina_demo/
-features.csv
 .idea/

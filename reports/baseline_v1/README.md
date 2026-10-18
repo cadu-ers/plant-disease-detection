@@ -22,4 +22,5 @@ Arquivos:
 | `training_history.png` | acurácia de treino e validação por época |
 | `resultado_20260919_172330.png` / `.txt` | exemplo da rotina de demonstração |
 
-O modelo fica em `models/baseline_v1/plant_disease_model.keras` (não versionado).
+O arquivo do modelo não foi mantido no repositório (não é usado por nenhum script);
+apenas os relatórios desta rodada foram preservados.

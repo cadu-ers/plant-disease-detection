@@ -28,14 +28,13 @@ Gera:
 
 import json
 import os
-import re
 import time
 
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 from sklearn.metrics import (
-    accuracy_score, classification_report, confusion_matrix,
+    accuracy_score, classification_report,
     f1_score, precision_score, recall_score,
 )
 from sklearn.utils.class_weight import compute_class_weight
@@ -46,7 +45,7 @@ from config import (
     SPLIT_DIR,
 )
 from model_utils import build_model
-from utils import list_images
+from utils import list_images, plot_confusion_matrix
 
 HISTORY_PATH = os.path.join(CNN_REPORTS_DIR, "training_history.png")
 REPORT_PATH = os.path.join(CNN_REPORTS_DIR, "classification_report.txt")
@@ -152,16 +151,6 @@ def save_history_json(history_initial, history_fine, path=HISTORY_JSON_PATH):
     print(f"Histórico salvo em: {path}")
 
 
-def short_name(class_name):
-    """Abrevia o nome da classe para os eixos da matriz de confusão."""
-    name = re.sub(r"_+", "_", class_name)
-    name = name.replace("Tomato_Tomato_", "Tomato_")
-    name = name.replace("_Two_spotted_spider_mite", "")
-    name = re.sub(r"^Tomato_", "Tom_", name)
-    name = re.sub(r"^Potato_", "Pot_", name)
-    return name
-
-
 def plot_history(history_initial, history_fine, path=HISTORY_PATH):
     # Épocas realmente executadas na etapa 1 (pode ser < INITIAL_EPOCHS com early stopping)
     n_initial = len(history_initial.history["accuracy"])
@@ -185,35 +174,6 @@ def plot_history(history_initial, history_fine, path=HISTORY_PATH):
     print(f"Gráfico salvo em: {path}")
 
 
-def plot_confusion_matrix(y_true, y_pred, class_names, path=CONFUSION_PATH):
-    """Matriz de confusão normalizada por linha (cada linha soma 1 = recall da classe)."""
-    cm = confusion_matrix(y_true, y_pred, labels=range(len(class_names)), normalize="true")
-    cm = np.nan_to_num(cm)
-    labels = [short_name(c) for c in class_names]
-
-    fig, ax = plt.subplots(figsize=(14, 12))
-    im = ax.imshow(cm, cmap="Blues", vmin=0, vmax=1)
-    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-
-    ax.set_xticks(range(len(labels)))
-    ax.set_yticks(range(len(labels)))
-    ax.set_xticklabels(labels, rotation=45, ha="right")
-    ax.set_yticklabels(labels)
-    ax.set_xlabel("Classe predita")
-    ax.set_ylabel("Classe real")
-    ax.set_title("Matriz de confusão (teste, normalizada por linha)")
-
-    for i in range(cm.shape[0]):
-        for j in range(cm.shape[1]):
-            color = "white" if cm[i, j] > 0.5 else "black"
-            ax.text(j, i, f"{cm[i, j]:.2f}", ha="center", va="center", color=color, fontsize=9)
-
-    plt.tight_layout()
-    plt.savefig(path, dpi=120)
-    plt.close(fig)
-    print(f"Matriz de confusão salva em: {path}")
-
-
 def evaluate(model, test_ds, class_names, train_time_seconds):
     """Avaliação final no conjunto de TESTE."""
     y_true = np.concatenate([labels.numpy() for _, labels in test_ds])
@@ -231,7 +191,7 @@ def evaluate(model, test_ds, class_names, train_time_seconds):
         f.write(report)
     print(f"Relatório salvo em: {REPORT_PATH}")
 
-    plot_confusion_matrix(y_true, y_pred, class_names)
+    plot_confusion_matrix(y_true, y_pred, class_names, path=CONFUSION_PATH)
 
     metrics = {
         "accuracy": accuracy_score(y_true, y_pred),
