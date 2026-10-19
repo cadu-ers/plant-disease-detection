@@ -19,6 +19,38 @@ Todas são geradas por `python src/run_pi.py` (detalhes em
 | Fallbacks (maior contorno < 5% da imagem) | 5 | [`qualidade_segmentacao.csv`](segmentacao/qualidade_segmentacao.csv) |
 | Casos suspeitos (folha < 10% ou > 95% da imagem) | 100 (49 + 51) | [`qualidade_segmentacao.csv`](segmentacao/qualidade_segmentacao.csv) |
 | Teorema da convolução: erro máximo (blur no espaço x na frequência) | 8,5e-14 níveis de cinza | painel de diferença absoluta de [`blur_espaco_vs_frequencia.png`](fft/blur_espaco_vs_frequencia.png) (também impresso pelo `fft_analysis.py`) |
+| Impacto da segmentação na etapa seguinte: recall de `Tomato_Early_blight` | 0,59 (máscara antiga, baseline) → 0,86 (máscara nova, CNN corrigida) | [resultados de IA](../ia/LEIAME.md) |
+
+## Parâmetros do bloco
+
+Todos ficam em [`src/config.py`](../../src/config.py) e nas constantes do topo de
+[`src/fft_analysis.py`](../../src/fft_analysis.py).
+
+| Etapa | Parâmetro | Valor | Por quê |
+|---|---|---|---|
+| Pré-processamento | Tamanho | 256x256 → 224x224 | Entrada uniforme: máscaras, espectros e medidas comparáveis |
+| Pré-processamento | Blur gaussiano | kernel 5x5 | Reduz o ruído que viraria pontos soltos na máscara |
+| Segmentação | Faixa verde (HSV) | H 25–90, S ≥ 40, V ≥ 40 | Tecido saudável da folha |
+| Segmentação | Faixa de lesão (HSV) | H 8–35, S ≥ 40, V ≥ 20 | Manchas marrons e amarelas; S ≥ 40 segura o fundo bege, V ≥ 20 recupera lesões escuras |
+| Segmentação | Morfologia | abertura + fechamento, kernel 5x5 | Remove pontos soltos e fecha falhas pequenas |
+| Segmentação | Contorno | maior contorno externo, preenchido | Tudo dentro da folha entra na máscara, inclusive as lesões |
+| Segmentação | Fallback | maior contorno < 5% da imagem | Evita jogar fora a folha quando o contorno falha |
+| FFT | Preparação | cinza da original, fundo = média da folha, sem DC, janela de Hann 2D | Evita o "+" do degrau folha/fundo e o vazamento espectral pelas bordas |
+| FFT | Passa-baixa gaussiano | D0 = 15 | Mostra o que fica só com as baixas frequências |
+| FFT | Corte alta/baixa | 0,25 da frequência de Nyquist | Razão de energia usada no espectro por classe |
+| FFT | Descritores | 8 faixas radiais (log), razão alta/baixa, centroide, entropia | 11 números de textura por imagem |
+
+## Como gerar cada figura
+
+| Figuras | Comando |
+|---|---|
+| Tudo de uma vez | `python src/run_pi.py` (pula o que já existe; `--force` refaz; `--so-figuras` só regera as figuras) |
+| `dados/*` | `python src/data_overview.py` (o `split_summary.csv` sai do `python src/split_dataset.py`) |
+| `segmentacao/etapas_segmentacao.png`, `qualidade_segmentacao.*`, `casos_suspeitos.png` | `python src/segmentation_report.py` |
+| `segmentacao/segmentation_comparison.png` | `python src/segmentation_report.py --comparacao` |
+| `segmentacao/estudo_limiares/*` | `python src/segmentation_report.py --comparacao --s <S> --v <V> --out <arquivo>` |
+| `fft/*` | `python src/fft_analysis.py` (a comparação com SVM só roda se `features_cache/handcrafted.csv` existir) |
+| `p1_histograma/*` | `python src/histogram_analysis.py` |
 
 SVM com descritores FFT ([`fft_svm.csv`](fft/fft_svm.csv); treinado só no treino, avaliado no teste):
 
