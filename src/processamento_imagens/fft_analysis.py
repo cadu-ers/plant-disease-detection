@@ -16,8 +16,9 @@ Preparação de cada imagem (prepare_image):
        suavemente a zero nas bordas.
     5. np.fft.fft2 + np.fft.fftshift (frequência zero no centro do espectro).
 
-Uso:
-    python src/fft_analysis.py
+Uso (na raiz do repositório, com src/ no PYTHONPATH: no Linux "export PYTHONPATH=src",
+no PowerShell '$env:PYTHONPATH = "src"'):
+    python -m processamento_imagens.fft_analysis
     (requer data/, data_split/split_manifest.csv e reports/pi/segmentacao/qualidade_segmentacao.csv,
      gerado por segmentation_report.py; todas as figuras são geradas sem nada do bloco de IA.
      Só a comparação com SVM usa features_cache/handcrafted.csv, do bloco de IA: se o
@@ -49,12 +50,12 @@ from sklearn.pipeline import make_pipeline  # noqa: E402
 from sklearn.preprocessing import StandardScaler  # noqa: E402
 from sklearn.svm import SVC  # noqa: E402
 
-from config import (  # noqa: E402
+from common.config import (  # noqa: E402
     FEATURES_DIR, FFT_FEATURES_PATH, FFT_REPORTS_DIR, HANDCRAFTED_PATH, SEED, SEG_IMG_SIZE,
     SEGMENTATION_QUALITY_PATH, SPLIT_MANIFEST,
 )
-from preprocessing import segment_image  # noqa: E402
-from utils import short_name, slide_style  # noqa: E402
+from processamento_imagens.preprocessing import segment_image  # noqa: E402
+from common.utils import short_name, slide_style  # noqa: E402
 
 N = SEG_IMG_SIZE[0]                 # imagens quadradas 224x224
 NYQUIST_RADIUS = N // 2             # raio (em pixels do espectro) da frequência de Nyquist

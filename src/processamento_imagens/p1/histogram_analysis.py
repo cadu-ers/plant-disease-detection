@@ -7,9 +7,10 @@ min-max mostrada aqui NÃO faz parte do pipeline final: o preprocessing.py
 não normaliza intensidade (as etapas são resize, blur, BGR->HSV e
 segmentação). Não é usado por nenhum outro script.
 
-Uso:
-    python src/histogram_analysis.py                      -> imagem aleatória de data/
-    python src/histogram_analysis.py caminho/da/imagem.jpg -> imagem específica
+Uso (na raiz do repositório, com src/ no PYTHONPATH: no Linux "export PYTHONPATH=src",
+no PowerShell '$env:PYTHONPATH = "src"'):
+    python -m processamento_imagens.p1.histogram_analysis                      -> imagem aleatória de data/
+    python -m processamento_imagens.p1.histogram_analysis caminho/da/imagem.jpg -> imagem específica
 
 Gera:
     reports/pi/p1_histograma/histograma_exemplo.png
@@ -21,8 +22,8 @@ import sys
 import cv2
 import matplotlib.pyplot as plt
 
-from config import DATA_DIR, P1_REPORTS_DIR
-from utils import pick_random_image
+from common.config import DATA_DIR, P1_REPORTS_DIR
+from common.utils import pick_random_image
 
 OUTPUT_PATH = os.path.join(P1_REPORTS_DIR, "histograma_exemplo.png")
 

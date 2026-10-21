@@ -38,12 +38,13 @@ Decisões de projeto:
       vantagem dos SVMs sobre a CNN se mantiver, ela vem da fusão/classificador e não
       dos dados extras.
 
-Uso:
-    python src/hybrid_classifier.py                       -> grade completa (protocolo principal)
-    python src/hybrid_classifier.py --quick               -> grade reduzida (teste rápido)
-    python src/hybrid_classifier.py --control-train-only  -> controle: SVMs ajustados só no treino
-    python src/hybrid_classifier.py --replot              -> só regera o comparativo.png principal
-    (requer features_cache/ gerado por src/extract_features.py)
+Uso (na raiz do repositório, com src/ no PYTHONPATH: no Linux "export PYTHONPATH=src",
+no PowerShell '$env:PYTHONPATH = "src"'):
+    python -m ia.hibrido.hybrid_classifier                       -> grade completa (protocolo principal)
+    python -m ia.hibrido.hybrid_classifier --quick               -> grade reduzida (teste rápido)
+    python -m ia.hibrido.hybrid_classifier --control-train-only  -> controle: SVMs ajustados só no treino
+    python -m ia.hibrido.hybrid_classifier --replot              -> só regera o comparativo.png principal
+    (requer features_cache/ gerado por src/ia/hibrido/extract_features.py)
 
 Gera (em reports/ia/hibrido/):
     metrics_<modelo>.json, classification_report_<modelo>.txt  (os 4 modelos)
@@ -79,12 +80,12 @@ from sklearn.pipeline import Pipeline  # noqa: E402
 from sklearn.preprocessing import StandardScaler  # noqa: E402
 from sklearn.svm import SVC  # noqa: E402
 
-from config import (  # noqa: E402
+from common.config import (  # noqa: E402
     CLASS_NAMES_PATH, CNN_EMBEDDINGS_PATH, CNN_REPORTS_DIR, CNN_TEST_PRED_PATH,
     HANDCRAFTED_PATH, HYBRID_CONTROL_REPORTS_DIR, HYBRID_MODEL_PATH, HYBRID_REPORTS_DIR,
     MODELS_DIR, SEED,
 )
-from utils import plot_confusion_matrix  # noqa: E402
+from common.utils import plot_confusion_matrix  # noqa: E402
 
 
 META_COLS = ["class", "filename", "split"]

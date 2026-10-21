@@ -5,7 +5,7 @@
 O projeto tem como objetivo identificar, a partir de uma imagem de folha,
 se a planta está saudável ou apresenta algum tipo de doença. O pipeline de
 processamento de imagens segue as etapas abaixo (1 a 4 em
-[`src/preprocessing.py`](../src/preprocessing.py); a 5 em [`src/features.py`](../src/features.py)):
+[`src/processamento_imagens/preprocessing.py`](../src/processamento_imagens/preprocessing.py); a 5 em [`src/processamento_imagens/features.py`](../src/processamento_imagens/features.py)):
 
 1. **Leitura e redimensionamento**: cada imagem é carregada e padronizada
    para 224x224 pixels, garantindo uma entrada uniforme para as etapas
@@ -31,12 +31,12 @@ processamento de imagens segue as etapas abaixo (1 a 4 em
      dela, virando "buracos" pretos na imagem segmentada — ou seja, o
      sintoma da doença era justamente o que estava sendo apagado. A
      comparação entre as duas abordagens pode ser gerada com
-     `python src/segmentation_report.py --comparacao` (salva em
+     `python -m processamento_imagens.segmentation_report --comparacao` (salva em
      [`reports/pi/segmentacao/segmentation_comparison.png`](../reports/pi/segmentacao/segmentation_comparison.png)).
    - **Escolha dos limiares da máscara de lesão**: o matiz (H ~8–35) foi
      fixado e testamos os mínimos de saturação (S) e brilho (V) nas mesmas
      12 imagens (seed 42), com
-     `python src/segmentation_report.py --comparacao --s <S> --v <V> --out <arquivo>`:
+     `python -m processamento_imagens.segmentation_report --comparacao --s <S> --v <V> --out <arquivo>`:
 
      | S | V | Lesões na borda | Vazamento de fundo | Imagem |
      |---|---|---|---|---|
@@ -50,7 +50,7 @@ processamento de imagens segue as etapas abaixo (1 a 4 em
      `Potato___Early_blight`) não são separáveis apenas por limiar de HSV.
      Uma melhoria futura seria segmentar a folha com GrabCut ou com um
      modelo de segmentação (ex.: U-Net).
-   - **Verificação objetiva** (`python src/segmentation_report.py`, em
+   - **Verificação objetiva** (`python -m processamento_imagens.segmentation_report`, em
      todas as 18.163 imagens; resultados em [`reports/pi/segmentacao/`](../reports/pi/segmentacao/)):
      - As etapas da segmentação estão em `etapas_segmentacao.png`. O
        script confere que a máscara final reimplementada para a figura é
@@ -77,7 +77,7 @@ processamento de imagens segue as etapas abaixo (1 a 4 em
          corretamente.
      - Os dois tipos de falha reforçam a melhoria futura citada acima
        (GrabCut ou U-Net).
-5. **Extração de features clássicas** (complementar, em [`src/features.py`](../src/features.py)):
+5. **Extração de features clássicas** (complementar, em [`src/processamento_imagens/features.py`](../src/processamento_imagens/features.py)):
    147 descritores de cor, proporção de lesão e textura (GLCM e LBP),
    calculados só nos pixels da folha (máscara da segmentação). Essa etapa
    foi separada do `preprocessing.py` (que só segmenta) e é usada pelo
@@ -85,11 +85,11 @@ processamento de imagens segue as etapas abaixo (1 a 4 em
 
 ## Figuras
 
-Etapas da segmentação (`python src/segmentation_report.py`):
+Etapas da segmentação (`python -m processamento_imagens.segmentation_report`):
 
 ![Etapas da segmentação](../reports/pi/segmentacao/etapas_segmentacao.png)
 
-Máscara antiga x nova (`python src/segmentation_report.py --comparacao`):
+Máscara antiga x nova (`python -m processamento_imagens.segmentation_report --comparacao`):
 
 ![Comparação máscara antiga x nova](../reports/pi/segmentacao/segmentation_comparison.png)
 
@@ -101,7 +101,7 @@ Verificação objetiva em todas as imagens:
 
 ## Histograma de intensidade (material da P1)
 
-O script `src/histogram_analysis.py` gera
+O script `src/processamento_imagens/p1/histogram_analysis.py` gera
 [`reports/pi/p1_histograma/histograma_exemplo.png`](../reports/pi/p1_histograma/histograma_exemplo.png), que
 compara o histograma de intensidade de uma imagem antes e depois de uma
 normalização min-max. É material da P1, mantido só como registro: essa

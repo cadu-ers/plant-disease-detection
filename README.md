@@ -67,11 +67,17 @@ Opções dos orquestradores, execução manual script por script, Docker e teste
 
 | Grupo | Scripts em `src/` |
 |---|---|
-| Orquestração | `run_pi.py`, `run_ia.py`, `run_all.py`, `orchestration.py` |
-| Processamento de Imagens | `download_dataset.py`, `preprocessing.py`, `split_dataset.py`, `data_overview.py`, `segmentation_report.py`, `fft_analysis.py`, `features.py`, `histogram_analysis.py` (P1) |
-| Inteligência Artificial | `model_utils.py`, `train_model.py`, `extract_features.py`, `hybrid_classifier.py`, `expert_system/` |
+| Orquestração | `run_pi.py`, `run_ia.py`, `run_all.py` (e `common/orchestration.py`) |
 | Demo | `demo_pi.py` (Processamento de Imagens), `demo_ia.py` (IA) |
-| Comuns e testes | `config.py`, `utils.py`, `tests/` |
+| Comuns | `common/`: `config.py`, `utils.py`, `orchestration.py` |
+| Dados | `dados/`: `download_dataset.py`, `split_dataset.py`, `data_overview.py` |
+| Processamento de Imagens | `processamento_imagens/`: `preprocessing.py`, `segmentation_report.py`, `fft_analysis.py`, `features.py`, `p1/histogram_analysis.py` (P1) |
+| Inteligência Artificial | `ia/cnn/`: `model_utils.py`, `train_model.py`; `ia/hibrido/`: `extract_features.py`, `hybrid_classifier.py`; `ia/expert_system/` |
+| Testes | `tests/` |
+
+Os scripts da raiz de `src/` rodam com `python src/<script>.py`; os das
+subpastas rodam como módulo (ex.: `python -m dados.split_dataset`), com `src/`
+no `PYTHONPATH` (ver [execução manual](docs/07_como_reproduzir.md#execução-manual-script-por-script)).
 
 Saídas: `reports/pi/` e `reports/ia/` (figuras e métricas de cada bloco, com
 índices em [reports/pi/LEIAME.md](reports/pi/LEIAME.md) e

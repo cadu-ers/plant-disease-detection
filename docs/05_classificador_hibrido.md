@@ -17,8 +17,8 @@ split fixo (data_split/split_manifest.csv: treino / validação / teste)
                                             → StandardScaler → PCA (64/128/256) ──────────┘
 ```
 
-Implementação: [`src/features.py`](../src/features.py) (features), [`src/extract_features.py`](../src/extract_features.py)
-(extrai e salva tudo em `features_cache/`) e [`src/hybrid_classifier.py`](../src/hybrid_classifier.py)
+Implementação: [`src/processamento_imagens/features.py`](../src/processamento_imagens/features.py) (features), [`src/ia/hibrido/extract_features.py`](../src/ia/hibrido/extract_features.py)
+(extrai e salva tudo em `features_cache/`) e [`src/ia/hibrido/hybrid_classifier.py`](../src/ia/hibrido/hybrid_classifier.py)
 (treino, avaliação e comparativo).
 
 **Features clássicas** (todas calculadas só nos pixels da folha, usando a
@@ -91,7 +91,7 @@ reajustados em treino + validação, 15.438 imagens):
 **Controle: SVMs ajustados só no treino.** No protocolo principal, os SVMs
 usam ~21% a mais de dados que a CNN (15.438 contra 12.714 imagens; a CNN só
 usou a validação para o early stopping). Para separar o efeito da fusão do
-efeito desses dados extras, o controle (`python src/hybrid_classifier.py
+efeito desses dados extras, o controle (`python -m ia.hibrido.hybrid_classifier
 --control-train-only`) reusa os mesmos hiperparâmetros e treina os SVMs só nas
 12.714 imagens de treino:
 

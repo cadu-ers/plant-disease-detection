@@ -9,10 +9,11 @@ intermediários são reimplementados aqui só para poder mostrá-los; o script
 confere que a máscara final reimplementada é idêntica à de segment_leaf.
 Não depende de nada do bloco de IA (features_cache/, models/).
 
-Uso:
-    python src/segmentation_report.py                -> etapas + qualidade + suspeitos
-    python src/segmentation_report.py --comparacao   -> máscara antiga x nova em 12 imagens
-    python src/segmentation_report.py --comparacao --s 40 --v 20 --out reports/pi/segmentacao/estudo_limiares/segmentation_S40_V20.png
+Uso (na raiz do repositório, com src/ no PYTHONPATH: no Linux "export PYTHONPATH=src",
+no PowerShell '$env:PYTHONPATH = "src"'):
+    python -m processamento_imagens.segmentation_report                -> etapas + qualidade + suspeitos
+    python -m processamento_imagens.segmentation_report --comparacao   -> máscara antiga x nova em 12 imagens
+    python -m processamento_imagens.segmentation_report --comparacao --s 40 --v 20 --out reports/pi/segmentacao/estudo_limiares/segmentation_S40_V20.png
         -> comparação com outros limites mínimos de S e V da máscara de lesão
     (requer data/ e data_split/split_manifest.csv)
 
@@ -39,15 +40,15 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 from joblib import Parallel, delayed  # noqa: E402
 
-from config import (  # noqa: E402
+from common.config import (  # noqa: E402
     DATA_DIR, LOWER_GREEN, LOWER_LESION, MIN_LEAF_AREA_RATIO, SEED, SEGMENTATION_QUALITY_PATH,
     SEGMENTATION_REPORTS_DIR,
     SPLIT_MANIFEST, UPPER_GREEN, UPPER_LESION,
 )
-from preprocessing import (  # noqa: E402
+from processamento_imagens.preprocessing import (  # noqa: E402
     denoise, load_and_resize, segment_image, segment_leaf, to_hsv,
 )
-from utils import list_classes, list_images, short_name, slide_style  # noqa: E402
+from common.utils import list_classes, list_images, short_name, slide_style  # noqa: E402
 
 COMPARISON_PATH = os.path.join(SEGMENTATION_REPORTS_DIR, "segmentation_comparison.png")
 COMPARISON_N_CLASSES = 6

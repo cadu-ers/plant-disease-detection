@@ -1,22 +1,19 @@
 """Linha de comando do sistema especialista.
 
-Uso (a partir da raiz do repositório):
-    python src/expert_system/diagnose.py src/expert_system/exemplos/late_blight_tomate.json
-    python src/expert_system/diagnose.py fatos.json --sem-cnn        # só regras (ablação)
-    python src/expert_system/diagnose.py fatos.json --interativo     # faz perguntas
+Uso (na raiz do repositório, com src/ no PYTHONPATH: no Linux "export PYTHONPATH=src",
+no PowerShell '$env:PYTHONPATH = "src"'):
+    python -m ia.expert_system.diagnose src/ia/expert_system/exemplos/late_blight_tomate.json
+    python -m ia.expert_system.diagnose fatos.json --sem-cnn        # só regras (ablação)
+    python -m ia.expert_system.diagnose fatos.json --interativo     # faz perguntas
 
 O JSON de entrada segue o contrato descrito em engine.py.
 """
 
 import argparse
 import json
-import os
-import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from expert_system import (carregar_kb, diagnosticar, diagnostico_interativo,  # noqa: E402
-                           explicar, proxima_pergunta)
+from ia.expert_system import (carregar_kb, diagnosticar, diagnostico_interativo,
+                              explicar, proxima_pergunta)
 
 
 def perguntar_no_terminal(sintoma):

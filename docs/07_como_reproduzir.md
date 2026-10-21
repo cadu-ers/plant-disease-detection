@@ -11,10 +11,12 @@ Para instalar:
 pip install -r requirements.txt
 ```
 
-Para baixar o data set e prepará-las em `data/`:
+Para baixar o data set e prepará-las em `data/` (na raiz do repositório; ver
+[Execução manual](#execução-manual-script-por-script) sobre o `PYTHONPATH`):
 
 ```bash
-python src/download_dataset.py
+export PYTHONPATH=src            # no PowerShell: $env:PYTHONPATH = "src"
+python -m dados.download_dataset
 ```
 
 Para rodar também os testes automatizados, instale `requirements-dev.txt`
@@ -155,14 +157,29 @@ se cada uma acertou) e `resultado_<timestamp>.txt` (os mesmos dados).
 
 ## Execução manual, script por script
 
+Os scripts da raiz de `src/` (`run_*.py` e `demo_*.py`) rodam direto com
+`python src/<script>.py`. Os das subpastas (`dados/`, `processamento_imagens/`,
+`ia/`) usam imports absolutos a partir de `src/` (ex.: `from common.config import ...`)
+e rodam como módulo, com `python -m`, a partir da raiz do repositório e com
+`src/` no `PYTHONPATH`. Basta definir o `PYTHONPATH` uma vez por terminal:
+
+| Sistema | Comando |
+|---|---|
+| Linux / macOS (bash) | `export PYTHONPATH=src` |
+| Windows (PowerShell) | `$env:PYTHONPATH = "src"` |
+
+Os orquestradores (`run_pi.py`, `run_ia.py`, `run_all.py`) já fazem isso
+sozinhos para as etapas que rodam.
+
 ```bash
 pip install -r requirements.txt
-python src/download_dataset.py
-python src/preprocessing.py
-python src/split_dataset.py
-python src/train_model.py
-python src/extract_features.py
-python src/hybrid_classifier.py
+export PYTHONPATH=src            # no PowerShell: $env:PYTHONPATH = "src"
+python -m dados.download_dataset
+python -m processamento_imagens.preprocessing
+python -m dados.split_dataset
+python -m ia.cnn.train_model
+python -m ia.hibrido.extract_features
+python -m ia.hibrido.hybrid_classifier
 python src/demo_pi.py
 python src/demo_ia.py
 ```
@@ -172,30 +189,31 @@ manifest do split. Só a comparação com SVM do `fft_analysis.py` usa
 `features_cache/handcrafted.csv`, do bloco de IA, e é pulada se o arquivo não existir):
 
 ```bash
-python src/data_overview.py
-python src/segmentation_report.py
-python src/fft_analysis.py
+python -m dados.data_overview
+python -m processamento_imagens.segmentation_report
+python -m processamento_imagens.fft_analysis
 ```
 
 Para um teste rápido do classificador híbrido (poucas imagens e grade
-reduzida): `python src/extract_features.py --limit 5` seguido de
-`python src/hybrid_classifier.py --quick`.
+reduzida): `python -m ia.hibrido.extract_features --limit 5` seguido de
+`python -m ia.hibrido.hybrid_classifier --quick`.
 
 Também fazem parte do bloco de PI a comparação máscara antiga x nova e o
 histograma da P1:
 
 ```bash
-python src/segmentation_report.py --comparacao
-python src/histogram_analysis.py
+python -m processamento_imagens.segmentation_report --comparacao
+python -m processamento_imagens.p1.histogram_analysis
 ```
 
 Sistema especialista (independente do pipeline acima; detalhes na seção
 [Sistema especialista](06_sistema_especialista.md)) e testes:
 
 ```bash
-python src/expert_system/diagnose.py src/expert_system/exemplos/late_blight_tomate.json
-python src/expert_system/diagnose.py src/expert_system/exemplos/late_blight_tomate.json --sem-cnn
-python src/expert_system/diagnose.py src/expert_system/exemplos/ambiguo_early_target.json --interativo
+export PYTHONPATH=src            # no PowerShell: $env:PYTHONPATH = "src"
+python -m ia.expert_system.diagnose src/ia/expert_system/exemplos/late_blight_tomate.json
+python -m ia.expert_system.diagnose src/ia/expert_system/exemplos/late_blight_tomate.json --sem-cnn
+python -m ia.expert_system.diagnose src/ia/expert_system/exemplos/ambiguo_early_target.json --interativo
 python -m pytest -q
 ```
 
@@ -211,17 +229,18 @@ Execute cada etapa do pipeline em um container. Os arquivos gerados ficam no
 workspace, pois o projeto é montado em `/app`:
 
 ```bash
-docker compose run --rm app python src/download_dataset.py
-docker compose run --rm app python src/preprocessing.py
-docker compose run --rm app python src/split_dataset.py
-docker compose run --rm app python src/train_model.py
-docker compose run --rm app python src/extract_features.py
-docker compose run --rm app python src/hybrid_classifier.py
+docker compose run --rm -e PYTHONPATH=src app python -m dados.download_dataset
+docker compose run --rm -e PYTHONPATH=src app python -m processamento_imagens.preprocessing
+docker compose run --rm -e PYTHONPATH=src app python -m dados.split_dataset
+docker compose run --rm -e PYTHONPATH=src app python -m ia.cnn.train_model
+docker compose run --rm -e PYTHONPATH=src app python -m ia.hibrido.extract_features
+docker compose run --rm -e PYTHONPATH=src app python -m ia.hibrido.hybrid_classifier
 docker compose run --rm app python src/demo_pi.py --sem-janela
 docker compose run --rm app python src/demo_ia.py --sem-janela
 ```
 
-Dentro do container não há tela: as demonstrações (`demo_pi.py` e `demo_ia.py`)
+O `-e PYTHONPATH=src` põe `src/` no `PYTHONPATH` dos scripts das subpastas,
+como na execução manual. Dentro do container não há tela: as demonstrações (`demo_pi.py` e `demo_ia.py`)
 precisam de `--sem-janela`. As figuras ficam em `rotina_demo/pi/` e
 `rotina_demo/ia/` no workspace.
 
@@ -258,32 +277,36 @@ O `Dockerfile` instala só o `requirements.txt` (sem o `pytest`).
 │       ├── hibrido/        # saídas do hybrid_classifier.py (métricas, comparativo, McNemar, controle)
 │       └── historico/      # rodadas antigas: baseline_v1/ e cnn_run1/, cada uma com README
 ├── src/
-│   │   # Orquestração
+│   │   # Orquestração e demo (rodam com python src/<script>.py)
 │   ├── run_pi.py           # bloco 1: Processamento de Imagens, etapa por etapa
 │   ├── run_ia.py           # bloco 2: Inteligência Artificial (usa as saídas do bloco 1)
 │   ├── run_all.py          # roda run_pi.py e depois run_ia.py
-│   ├── orchestration.py    # funções comuns dos orquestradores (subprocesso, plano, resumo)
-│   │   # Comuns
-│   ├── config.py           # constantes compartilhadas (caminhos, tamanhos, seed, limiares HSV)
-│   ├── utils.py            # funções auxiliares (listar classes/imagens, sortear imagem, matriz de confusão)
-│   │   # Bloco 1: Processamento de Imagens
-│   ├── download_dataset.py # baixa o PlantVillage e copia as classes de tomate/batata para data/
-│   ├── preprocessing.py    # pipeline de processamento de imagens (segmentação -> data_processed/)
-│   ├── split_dataset.py    # divisão estratificada treino/val/teste (70/15/15) -> data_split/ + manifest
-│   ├── data_overview.py    # exemplos por classe e resumo de resolução/formato (reports/pi/dados/)
-│   ├── segmentation_report.py # etapas, verificação objetiva e comparação antiga x nova (reports/pi/segmentacao/)
-│   ├── fft_analysis.py     # FFT: espectros, magnitude x fase, teorema da convolução, descritores
-│   ├── features.py         # features clássicas da folha (cor, lesão, GLCM, LBP) para o classificador híbrido
-│   ├── histogram_analysis.py  # histograma antes/depois da normalização (material da P1, fora do pipeline)
-│   │   # Bloco 2: Inteligência Artificial
-│   ├── model_utils.py      # arquitetura do modelo usada no treino (augmentation + MobileNetV2 + cabeça)
-│   ├── train_model.py      # treino da CNN
-│   ├── extract_features.py # extrai features clássicas + embeddings da CNN -> features_cache/
-│   ├── hybrid_classifier.py  # SVMs (clássicas / CNN / híbrido) x CNN no teste + McNemar + controle
-│   ├── expert_system/      # sistema especialista: base de conhecimento (YAML), motor de inferência e diagnose.py
-│   │   # Demo e testes
 │   ├── demo_pi.py          # demonstração do Processamento de Imagens (segmentação, FFT, histogramas HSV)
 │   ├── demo_ia.py          # demonstração da IA (CNN top 3 + SVM híbrido em uma imagem)
+│   │   # Subpastas (rodam com python -m, com src/ no PYTHONPATH)
+│   ├── common/             # comuns
+│   │   ├── config.py           # constantes compartilhadas (caminhos, tamanhos, seed, limiares HSV)
+│   │   ├── utils.py            # funções auxiliares (listar classes/imagens, sortear imagem, matriz de confusão)
+│   │   └── orchestration.py    # funções comuns dos orquestradores (subprocesso, plano, resumo)
+│   ├── dados/              # bloco 1: dados
+│   │   ├── download_dataset.py # baixa o PlantVillage e copia as classes de tomate/batata para data/
+│   │   ├── split_dataset.py    # divisão estratificada treino/val/teste (70/15/15) -> data_split/ + manifest
+│   │   └── data_overview.py    # exemplos por classe e resumo de resolução/formato (reports/pi/dados/)
+│   ├── processamento_imagens/  # bloco 1: Processamento de Imagens
+│   │   ├── preprocessing.py    # pipeline de processamento de imagens (segmentação -> data_processed/)
+│   │   ├── segmentation_report.py # etapas, verificação objetiva e comparação antiga x nova (reports/pi/segmentacao/)
+│   │   ├── fft_analysis.py     # FFT: espectros, magnitude x fase, teorema da convolução, descritores
+│   │   ├── features.py         # features clássicas da folha (cor, lesão, GLCM, LBP) para o classificador híbrido
+│   │   └── p1/
+│   │       └── histogram_analysis.py  # histograma antes/depois da normalização (material da P1, fora do pipeline)
+│   ├── ia/                 # bloco 2: Inteligência Artificial
+│   │   ├── cnn/
+│   │   │   ├── model_utils.py      # arquitetura do modelo usada no treino (augmentation + MobileNetV2 + cabeça)
+│   │   │   └── train_model.py      # treino da CNN
+│   │   ├── hibrido/
+│   │   │   ├── extract_features.py # extrai features clássicas + embeddings da CNN -> features_cache/
+│   │   │   └── hybrid_classifier.py  # SVMs (clássicas / CNN / híbrido) x CNN no teste + McNemar + controle
+│   │   └── expert_system/      # sistema especialista: base de conhecimento (YAML), motor de inferência e diagnose.py
 │   └── tests/              # testes automatizados do sistema especialista (pytest)
 ├── requirements.txt        # dependências para rodar o projeto
 ├── requirements-dev.txt    # requirements.txt + pytest

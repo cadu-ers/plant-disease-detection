@@ -31,12 +31,12 @@ import argparse
 import os
 import sys
 
-from config import (
+from common.config import (
     DATA_DIR, DATA_REPORTS_DIR, FFT_FEATURES_PATH, FFT_REPORTS_DIR, IMAGE_EXTENSIONS,
     P1_REPORTS_DIR, PROCESSED_DIR, SEGMENTATION_QUALITY_PATH, SEGMENTATION_REPORTS_DIR,
     SPLIT_MANIFEST,
 )
-from orchestration import Step, go_to_project_root, run_steps
+from common.orchestration import Step, go_to_project_root, run_steps
 
 SEGMENTATION_OUTPUTS = [os.path.join(SEGMENTATION_REPORTS_DIR, f) for f in (
     "etapas_segmentacao.png", "qualidade_segmentacao.png", "casos_suspeitos.png")] + [
@@ -73,30 +73,30 @@ def skip_if_exists(paths, force):
 
 def figure_steps():
     return [
-        Step("data_overview", "src/data_overview.py"),
-        Step("segmentation_report", "src/segmentation_report.py"),
-        Step("fft_analysis", "src/fft_analysis.py"),
+        Step("data_overview", "dados.data_overview"),
+        Step("segmentation_report", "processamento_imagens.segmentation_report"),
+        Step("fft_analysis", "processamento_imagens.fft_analysis"),
     ]
 
 
 def all_steps(force):
     return [
-        Step("download_dataset", "src/download_dataset.py",
+        Step("download_dataset", "dados.download_dataset",
              skip_reason=f"já existe ({DATA_DIR}/ tem imagens)" if has_images(DATA_DIR) else None),
-        Step("preprocessing", "src/preprocessing.py",
+        Step("preprocessing", "processamento_imagens.preprocessing",
              skip_reason=None if force or not has_images(PROCESSED_DIR)
              else f"já existe ({PROCESSED_DIR}/ tem imagens)"),
-        Step("split_dataset", "src/split_dataset.py",
+        Step("split_dataset", "dados.split_dataset",
              skip_reason=skip_if_exists([SPLIT_MANIFEST], force)),
-        Step("data_overview", "src/data_overview.py",
+        Step("data_overview", "dados.data_overview",
              skip_reason=skip_if_exists(DATA_OUTPUTS, force)),
-        Step("segmentation_report", "src/segmentation_report.py",
+        Step("segmentation_report", "processamento_imagens.segmentation_report",
              skip_reason=skip_if_exists(SEGMENTATION_OUTPUTS, force)),
-        Step("segmentation_comparacao", "src/segmentation_report.py", ["--comparacao"],
+        Step("segmentation_comparacao", "processamento_imagens.segmentation_report", ["--comparacao"],
              skip_reason=skip_if_exists([COMPARISON_OUTPUT], force)),
-        Step("fft_analysis", "src/fft_analysis.py",
+        Step("fft_analysis", "processamento_imagens.fft_analysis",
              skip_reason=skip_if_exists(FFT_OUTPUTS, force)),
-        Step("histogram_analysis", "src/histogram_analysis.py",
+        Step("histogram_analysis", "processamento_imagens.p1.histogram_analysis",
              skip_reason=skip_if_exists([HISTOGRAM_OUTPUT], force)),
     ]
 
