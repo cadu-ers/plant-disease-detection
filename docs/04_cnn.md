@@ -4,7 +4,7 @@
 
 A saída do pipeline de processamento de imagens (imagens segmentadas)
 alimenta um modelo de classificação baseado em **transfer learning**
-(implementado em [`src/train_model.py`](../src/train_model.py)). O pipeline completo do projeto é:
+(implementado em [`src/ia/cnn/train_model.py`](../src/ia/cnn/train_model.py)). O pipeline completo do projeto é:
 
 ```
 Imagem bruta
@@ -20,7 +20,7 @@ Imagem bruta
 Etapas do treino:
 
 1. **Carregamento**: as imagens de `data_processed/` são divididas por
-   [`src/split_dataset.py`](../src/split_dataset.py) em 70% treino / 15% validação / 15% teste
+   [`src/dados/split_dataset.py`](../src/dados/split_dataset.py) em 70% treino / 15% validação / 15% teste
    (estratificado por classe, seed 42), com a divisão registrada em
    `data_split/split_manifest.csv`. A validação é usada só no early
    stopping; as métricas finais são calculadas no teste, que nunca entra

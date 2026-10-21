@@ -2,7 +2,7 @@
 
 # FFT (domínio da frequência)
 
-Implementado em [`src/fft_analysis.py`](../src/fft_analysis.py), com figuras em [`reports/pi/fft/`](../reports/pi/fft/).
+Implementado em [`src/processamento_imagens/fft_analysis.py`](../src/processamento_imagens/fft_analysis.py), com figuras em [`reports/pi/fft/`](../reports/pi/fft/).
 
 **Preparação de cada imagem**:
 1. Tom de cinza da imagem original 224x224, antes do blur, porque o blur

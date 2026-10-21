@@ -6,9 +6,10 @@ O conjunto de teste é fixo e NUNCA pode ser usado no treino nem na seleção
 de modelo. O classificador híbrido (próximo checkpoint) reutiliza exatamente
 esta divisão, pelo manifest.
 
-Uso:
-    python src/split_dataset.py
-    (requer data_processed/ gerado por src/preprocessing.py)
+Uso (na raiz do repositório, com src/ no PYTHONPATH: no Linux "export PYTHONPATH=src",
+no PowerShell '$env:PYTHONPATH = "src"'):
+    python -m dados.split_dataset
+    (requer data_processed/ gerado por src/processamento_imagens/preprocessing.py)
 
 Gera:
     data_split/{train,val,test}/<NomeDaClasse>/*.jpg   -> cópias das imagens segmentadas
@@ -22,10 +23,10 @@ import shutil
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from config import (
+from common.config import (
     DATA_DIR, PROCESSED_DIR, SEED, SPLIT_DIR, SPLIT_MANIFEST, SPLIT_RATIOS, SPLIT_SUMMARY_PATH,
 )
-from utils import list_classes, list_images
+from common.utils import list_classes, list_images
 
 SPLITS = ("train", "val", "test")
 

@@ -23,8 +23,8 @@ Todas são geradas por `python src/run_pi.py` (detalhes em
 
 ## Parâmetros do bloco
 
-Todos ficam em [`src/config.py`](../../src/config.py) e nas constantes do topo de
-[`src/fft_analysis.py`](../../src/fft_analysis.py).
+Todos ficam em [`src/common/config.py`](../../src/common/config.py) e nas constantes do topo de
+[`src/processamento_imagens/fft_analysis.py`](../../src/processamento_imagens/fft_analysis.py).
 
 | Etapa | Parâmetro | Valor | Por quê |
 |---|---|---|---|
@@ -45,12 +45,15 @@ Todos ficam em [`src/config.py`](../../src/config.py) e nas constantes do topo d
 | Figuras | Comando |
 |---|---|
 | Tudo de uma vez | `python src/run_pi.py` (pula o que já existe; `--force` refaz; `--so-figuras` só regera as figuras) |
-| `dados/*` | `python src/data_overview.py` (o `split_summary.csv` sai do `python src/split_dataset.py`) |
-| `segmentacao/etapas_segmentacao.png`, `qualidade_segmentacao.*`, `casos_suspeitos.png` | `python src/segmentation_report.py` |
-| `segmentacao/segmentation_comparison.png` | `python src/segmentation_report.py --comparacao` |
-| `segmentacao/estudo_limiares/*` | `python src/segmentation_report.py --comparacao --s <S> --v <V> --out <arquivo>` |
-| `fft/*` | `python src/fft_analysis.py` (a comparação com SVM só roda se `features_cache/handcrafted.csv` existir) |
-| `p1_histograma/*` | `python src/histogram_analysis.py` |
+| `dados/*` | `python -m dados.data_overview` (o `split_summary.csv` sai do `python -m dados.split_dataset`) |
+| `segmentacao/etapas_segmentacao.png`, `qualidade_segmentacao.*`, `casos_suspeitos.png` | `python -m processamento_imagens.segmentation_report` |
+| `segmentacao/segmentation_comparison.png` | `python -m processamento_imagens.segmentation_report --comparacao` |
+| `segmentacao/estudo_limiares/*` | `python -m processamento_imagens.segmentation_report --comparacao --s <S> --v <V> --out <arquivo>` |
+| `fft/*` | `python -m processamento_imagens.fft_analysis` (a comparação com SVM só roda se `features_cache/handcrafted.csv` existir) |
+| `p1_histograma/*` | `python -m processamento_imagens.p1.histogram_analysis` |
+
+Os comandos `python -m` rodam na raiz do repositório com `src/` no `PYTHONPATH`
+(`export PYTHONPATH=src`; no PowerShell, `$env:PYTHONPATH = "src"`).
 
 SVM com descritores FFT ([`fft_svm.csv`](fft/fft_svm.csv); treinado só no treino, avaliado no teste):
 

@@ -15,7 +15,7 @@ Gera:
 import argparse
 import sys
 
-from orchestration import Step, go_to_project_root, run_steps
+from common.orchestration import Step, go_to_project_root, run_steps
 
 
 def main():

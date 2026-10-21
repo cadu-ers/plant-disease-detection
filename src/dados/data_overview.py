@@ -2,8 +2,9 @@
 Visão geral do dataset: uma imagem de exemplo por classe e um resumo de
 quantidade, resolução, formato e modo de cor de TODAS as imagens de data/.
 
-Uso:
-    python src/data_overview.py
+Uso (na raiz do repositório, com src/ no PYTHONPATH: no Linux "export PYTHONPATH=src",
+no PowerShell '$env:PYTHONPATH = "src"'):
+    python -m dados.data_overview
 
 Gera (em reports/pi/dados/):
     exemplos_por_classe.png   -> 1 imagem original por classe (título: classe e nº de imagens)
@@ -21,8 +22,8 @@ import matplotlib.pyplot as plt  # noqa: E402
 import pandas as pd  # noqa: E402
 from PIL import Image  # noqa: E402
 
-from config import DATA_DIR, DATA_REPORTS_DIR, SEED  # noqa: E402
-from utils import list_classes, list_images, slide_style  # noqa: E402
+from common.config import DATA_DIR, DATA_REPORTS_DIR, SEED  # noqa: E402
+from common.utils import list_classes, list_images, slide_style  # noqa: E402
 
 
 def describe(counter):

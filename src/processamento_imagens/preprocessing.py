@@ -8,10 +8,11 @@ Etapas (na ordem em que são executadas):
     3. Conversão de espaço de cor (BGR -> HSV; o OpenCV lê as imagens em BGR)
     4. Segmentação da folha (máscara verde + lesão, contorno externo preenchido)
 
-A extração de features clássicas fica em src/features.py.
+A extração de features clássicas fica em src/processamento_imagens/features.py.
 
-Uso:
-    python src/preprocessing.py
+Uso (na raiz do repositório, com src/ no PYTHONPATH: no Linux "export PYTHONPATH=src",
+no PowerShell '$env:PYTHONPATH = "src"'):
+    python -m processamento_imagens.preprocessing
     (requer o dataset em data/<NomeDaClasse>/*.jpg)
 
 Gera:
@@ -23,11 +24,11 @@ import os
 import cv2
 import numpy as np
 
-from config import (
+from common.config import (
     DATA_DIR, PROCESSED_DIR, SEG_IMG_SIZE,
     LOWER_GREEN, UPPER_GREEN, LOWER_LESION, UPPER_LESION, MIN_LEAF_AREA_RATIO,
 )
-from utils import list_classes, list_images
+from common.utils import list_classes, list_images
 
 
 def load_and_resize(path, size=SEG_IMG_SIZE):

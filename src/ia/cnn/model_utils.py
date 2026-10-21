@@ -8,7 +8,7 @@ precisam reconstruir a arquitetura. As camadas de augmentation ficam dentro do m
 no treino.
 
 Uso:
-    from model_utils import build_model
+    from ia.cnn.model_utils import build_model
     model, base_model = build_model(num_classes)
 
 Gera:
@@ -19,7 +19,7 @@ import tensorflow as tf
 from tensorflow.keras import layers, models
 from tensorflow.keras.applications import MobileNetV2
 
-from config import MODEL_IMG_SIZE
+from common.config import MODEL_IMG_SIZE
 
 
 def build_model(num_classes, weights="imagenet"):

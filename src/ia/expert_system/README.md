@@ -8,9 +8,10 @@ ranqueadas com **explicação**.
 
 ```bash
 pip install pyyaml pytest            # pyyaml deve entrar no requirements.txt
-python src/expert_system/diagnose.py src/expert_system/exemplos/late_blight_tomate.json
-python src/expert_system/diagnose.py src/expert_system/exemplos/ambiguo_early_target.json --interativo
-python src/expert_system/diagnose.py fatos.json --sem-cnn      # só regras (para a ablação)
+export PYTHONPATH=src                # na raiz do repositório; no PowerShell: $env:PYTHONPATH = "src"
+python -m ia.expert_system.diagnose src/ia/expert_system/exemplos/late_blight_tomate.json
+python -m ia.expert_system.diagnose src/ia/expert_system/exemplos/ambiguo_early_target.json --interativo
+python -m ia.expert_system.diagnose fatos.json --sem-cnn      # só regras (para a ablação)
 pytest                                                          # na raiz do repositório
 ```
 

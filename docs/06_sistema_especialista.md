@@ -2,33 +2,35 @@
 
 # Sistema especialista
 
-O projeto também possui um sistema especialista em [`src/expert_system/`](../src/expert_system/).
+O projeto também possui um sistema especialista em [`src/ia/expert_system/`](../src/ia/expert_system/).
 Ele recebe fatos sobre a planta e aplica regras do tipo **SE... ENTÃO...**
 para ranquear doenças, calcular fatores de certeza e explicar o resultado.
 
-A base de conhecimento está em [`src/expert_system/knowledge_base.yaml`](../src/expert_system/knowledge_base.yaml) e
+A base de conhecimento está em [`src/ia/expert_system/knowledge_base.yaml`](../src/ia/expert_system/knowledge_base.yaml) e
 contém os sintomas, as 13 doenças, as regras, os fatores de certeza e as
 recomendações gerais. O motor também pode receber probabilidades produzidas
 pela CNN por meio do campo `cnn_prior`.
 
 ## Executar um diagnóstico de exemplo
 
-Na raiz do projeto, execute:
+Na raiz do projeto, com `src/` no `PYTHONPATH` (ver
+[execução manual](07_como_reproduzir.md#execução-manual-script-por-script)), execute:
 
 ```bash
-python src/expert_system/diagnose.py src/expert_system/exemplos/late_blight_tomate.json
+export PYTHONPATH=src            # no PowerShell: $env:PYTHONPATH = "src"
+python -m ia.expert_system.diagnose src/ia/expert_system/exemplos/late_blight_tomate.json
 ```
 
 Para executar sem utilizar a evidência da CNN:
 
 ```bash
-python src/expert_system/diagnose.py src/expert_system/exemplos/late_blight_tomate.json --sem-cnn
+python -m ia.expert_system.diagnose src/ia/expert_system/exemplos/late_blight_tomate.json --sem-cnn
 ```
 
 Para utilizar o modo interativo:
 
 ```bash
-python src/expert_system/diagnose.py src/expert_system/exemplos/ambiguo_early_target.json --interativo
+python -m ia.expert_system.diagnose src/ia/expert_system/exemplos/ambiguo_early_target.json --interativo
 ```
 
 O resultado apresenta a hipótese principal, as evidências das regras, as
@@ -51,4 +53,4 @@ Os testes cobrem o carregamento da base de conhecimento, o mapeamento das
 classes, o cálculo dos fatores de certeza, as regras de diagnóstico, as
 explicações e o modo interativo.
 
-Documentação do próprio módulo: [`src/expert_system/README.md`](../src/expert_system/README.md).
+Documentação do próprio módulo: [`src/ia/expert_system/README.md`](../src/ia/expert_system/README.md).

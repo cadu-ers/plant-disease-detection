@@ -2,8 +2,9 @@
 Baixa o PlantVillage do Kaggle e copia só as classes de tomate e batata
 para data/.
 
-Uso:
-    python src/download_dataset.py
+Uso (na raiz do repositório, com src/ no PYTHONPATH: no Linux "export PYTHONPATH=src",
+no PowerShell '$env:PYTHONPATH = "src"'):
+    python -m dados.download_dataset
 
 Gera:
     data/<NomeDaClasse>/*.jpg   -> 13 classes de tomate e batata
@@ -14,7 +15,7 @@ import shutil
 
 import kagglehub
 
-from config import DATA_DIR, IMAGE_EXTENSIONS
+from common.config import DATA_DIR, IMAGE_EXTENSIONS
 
 DATASET_HANDLE = "emmarex/plantdisease"
 CLASS_PREFIXES = ("tomato", "potato")
