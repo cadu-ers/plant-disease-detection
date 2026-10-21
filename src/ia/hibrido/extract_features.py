@@ -8,10 +8,11 @@ Extrai as features usadas pelo classificador híbrido, na ordem do split fixo
        calculados nas imagens de data_processed/ (a mesma entrada do treino da
        CNN), sem augmentation; e as probabilidades softmax da CNN no teste.
 
-Uso:
-    python src/extract_features.py               -> todas as imagens do manifest
-    python src/extract_features.py --limit 5     -> 5 imagens por classe por split (teste rápido)
-    python src/extract_features.py --verbose     -> mostra os logs do TensorFlow
+Uso (na raiz do repositório, com src/ no PYTHONPATH: no Linux "export PYTHONPATH=src",
+no PowerShell '$env:PYTHONPATH = "src"'):
+    python -m ia.hibrido.extract_features               -> todas as imagens do manifest
+    python -m ia.hibrido.extract_features --limit 5     -> 5 imagens por classe por split (teste rápido)
+    python -m ia.hibrido.extract_features --verbose     -> mostra os logs do TensorFlow
     (requer data_split/ de split_dataset.py e models/ de train_model.py)
 
 Gera:
@@ -38,12 +39,12 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 from joblib import Parallel, delayed  # noqa: E402
 
-from config import (  # noqa: E402
+from common.config import (  # noqa: E402
     BATCH_SIZE, CLASS_NAMES_PATH, CNN_EMBEDDINGS_PATH, CNN_TEST_PRED_PATH, FEATURES_DIR,
     HANDCRAFTED_PATH, MODEL_IMG_SIZE, MODEL_PATH, SPLIT_MANIFEST,
 )
-from features import extract_handcrafted, feature_names  # noqa: E402
-from preprocessing import segment_image  # noqa: E402
+from processamento_imagens.features import extract_handcrafted, feature_names  # noqa: E402
+from processamento_imagens.preprocessing import segment_image  # noqa: E402
 
 
 def parse_args():

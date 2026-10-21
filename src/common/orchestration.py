@@ -5,7 +5,7 @@ parada na primeira etapa com erro (dizendo o comando para reproduzi-lo) e uma
 tabela-resumo no fim (etapa | status | tempo).
 
 Uso:
-    from orchestration import Step, run_steps, go_to_project_root
+    from common.orchestration import Step, run_steps, go_to_project_root
 
 Gera:
     nada (módulo de funções auxiliares)
@@ -18,13 +18,18 @@ import time
 from dataclasses import dataclass, field
 
 # Raiz do projeto: os scripts usam caminhos relativos a ela (data/, reports/, ...)
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# (este arquivo está em src/common/, então sobe 3 níveis)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Base dos imports absolutos (common.config, processamento_imagens.preprocessing, ...)
+SRC_DIR = os.path.join(PROJECT_ROOT, "src")
 
 
 @dataclass
 class Step:
-    """Uma etapa: um script de src/ com argumentos.
+    """Uma etapa: um script com argumentos.
 
+    script: caminho de um script da raiz de src/ (ex.: "src/run_pi.py") ou nome de
+        módulo de uma subpasta, rodado com python -m (ex.: "dados.split_dataset").
     skip_reason: se não for None, a etapa é pulada e o motivo é mostrado.
     note: aviso mostrado antes de rodar (ex.: etapa demorada).
     """
@@ -34,11 +39,16 @@ class Step:
     skip_reason: str = None
     note: str = None
 
+    def is_module(self):
+        return not self.script.endswith(".py")
+
     def command(self):
-        return [sys.executable, self.script, *self.args]
+        target = ["-m", self.script] if self.is_module() else [self.script]
+        return [sys.executable, *target, *self.args]
 
     def display(self):
-        return "python " + " ".join([self.script, *self.args])
+        target = ["-m", self.script] if self.is_module() else [self.script]
+        return "python " + " ".join([*target, *self.args])
 
 
 def go_to_project_root():
@@ -50,6 +60,9 @@ def _child_env():
     env = os.environ.copy()
     env["MPLBACKEND"] = "Agg"   # plt.show() dos scripts não abre janela nem trava a execução
     env["PYTHONUTF8"] = "1"     # acentos nas saídas dos scripts, também no Windows
+    # src/ no PYTHONPATH para os módulos das subpastas (python -m dados.split_dataset)
+    # acharem os imports absolutos; os.pathsep é ";" no Windows e ":" no Linux
+    env["PYTHONPATH"] = os.pathsep.join(p for p in (SRC_DIR, env.get("PYTHONPATH")) if p)
     return env
 
 
@@ -105,5 +118,8 @@ def run_steps(title, steps):
     if failed is not None:
         print(f"\nErro na etapa '{failed.name}'. Para reproduzir o erro, rode na raiz do projeto:")
         print(f"    {failed.display()}")
+        if failed.is_module():
+            print('    (com src/ no PYTHONPATH: no Linux "export PYTHONPATH=src", '
+                  'no PowerShell \'$env:PYTHONPATH = "src"\')')
         return 1
     return 0

@@ -37,18 +37,18 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-from config import (  # noqa: E402
+from common.config import (  # noqa: E402
     FFT_FEATURES_PATH, LOWER_GREEN, LOWER_LESION, PI_DEMO_DIR, PI_DEMO_LAST_PATH,
     SEGMENTATION_QUALITY_PATH,
     SPLIT_MANIFEST, UPPER_GREEN, UPPER_LESION,
 )
-from fft_analysis import (  # noqa: E402
+from processamento_imagens.fft_analysis import (  # noqa: E402
     HIGH_LOW_CUT, LOWPASS_D0, fft_descriptors, gaussian_lowpass, normalize01, prepare_image,
     reconstruct, spectrum,
 )
-from preprocessing import segment_image  # noqa: E402
-from segmentation_report import lesion_ratio_from_steps, rgb, segmentation_steps  # noqa: E402
-from utils import describe_image, load_manifest, pick_test_image, slide_style  # noqa: E402
+from processamento_imagens.preprocessing import segment_image  # noqa: E402
+from processamento_imagens.segmentation_report import lesion_ratio_from_steps, rgb, segmentation_steps  # noqa: E402
+from common.utils import describe_image, load_manifest, pick_test_image, slide_style  # noqa: E402
 
 
 COLOR_LEAF, COLOR_OTHER = "#2a78d6", "#52514e"          # folha = azul; imagem inteira/fundo = cinza

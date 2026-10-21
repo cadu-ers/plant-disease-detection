@@ -6,12 +6,12 @@ import copy
 import pytest
 import yaml
 
-from expert_system import (carregar_kb, chave_canonica, diagnosticar,
-                           diagnostico_interativo, explicar, proxima_pergunta)
-from expert_system.classes import CHAVES_CANONICAS, MAPEAMENTO_DATASET
-from expert_system.engine import combinar, combinar_cf
-from expert_system.fuzzy import trapezio
-from expert_system.kb import KB_PADRAO, kb_de_dict
+from ia.expert_system import (carregar_kb, chave_canonica, diagnosticar,
+                              diagnostico_interativo, explicar, proxima_pergunta)
+from ia.expert_system.classes import CHAVES_CANONICAS, MAPEAMENTO_DATASET
+from ia.expert_system.engine import combinar, combinar_cf
+from ia.expert_system.fuzzy import trapezio
+from ia.expert_system.kb import KB_PADRAO, kb_de_dict
 
 
 @pytest.fixture(scope="module")

@@ -3,9 +3,9 @@ Funções utilitárias: listar classes e imagens do dataset e plotar a matriz de
 confusão no padrão do projeto.
 
 Uso:
-    from utils import list_classes, list_images, pick_random_image
-    from utils import short_name, plot_confusion_matrix, slide_style
-    from utils import load_manifest, pick_test_image, describe_image
+    from common.utils import list_classes, list_images, pick_random_image
+    from common.utils import short_name, plot_confusion_matrix, slide_style
+    from common.utils import load_manifest, pick_test_image, describe_image
 
 Gera:
     nada (módulo de funções auxiliares)
@@ -17,7 +17,7 @@ import re
 
 import numpy as np
 
-from config import DATA_DIR, IMAGE_EXTENSIONS, SPLIT_MANIFEST
+from common.config import DATA_DIR, IMAGE_EXTENSIONS, SPLIT_MANIFEST
 
 
 def list_classes(data_dir):

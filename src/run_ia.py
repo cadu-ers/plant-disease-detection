@@ -32,12 +32,12 @@ import argparse
 import os
 import sys
 
-from config import (
+from common.config import (
     CNN_EMBEDDINGS_PATH, CNN_TEST_PRED_PATH, HANDCRAFTED_PATH, HYBRID_MODEL_PATH,
     HYBRID_CONTROL_REPORTS_DIR, HYBRID_REPORTS_DIR, IMAGE_EXTENSIONS, MODEL_PATH, PROCESSED_DIR,
     SPLIT_MANIFEST,
 )
-from orchestration import Step, go_to_project_root, run_steps
+from common.orchestration import Step, go_to_project_root, run_steps
 
 FEATURE_OUTPUTS = [HANDCRAFTED_PATH, CNN_EMBEDDINGS_PATH, CNN_TEST_PRED_PATH]
 HYBRID_OUTPUTS = [os.path.join(HYBRID_REPORTS_DIR, "comparativo.csv"), HYBRID_MODEL_PATH]
@@ -53,7 +53,7 @@ def pi_outputs_exist():
 
 def build_steps(force, retrain, without_hybrid):
     train = retrain or not os.path.exists(MODEL_PATH)
-    steps = [Step("train_model", "src/train_model.py",
+    steps = [Step("train_model", "ia.cnn.train_model",
                   skip_reason=None if train
                   else f"já existe ({MODEL_PATH}; use --treinar para treinar de novo)",
                   note="o treino da CNN leva ~1h30 em CPU")]
@@ -65,11 +65,11 @@ def build_steps(force, retrain, without_hybrid):
     hybrid = extract or not all(os.path.exists(p) for p in HYBRID_OUTPUTS)
     control = hybrid or not all(os.path.exists(p) for p in CONTROL_OUTPUTS)
     steps += [
-        Step("extract_features", "src/extract_features.py",
+        Step("extract_features", "ia.hibrido.extract_features",
              skip_reason=None if extract else "já existe (features_cache/ completo)"),
-        Step("hybrid_classifier", "src/hybrid_classifier.py",
+        Step("hybrid_classifier", "ia.hibrido.hybrid_classifier",
              skip_reason=None if hybrid else f"já existe ({HYBRID_OUTPUTS[0]} e {HYBRID_MODEL_PATH})"),
-        Step("hybrid_controle", "src/hybrid_classifier.py", ["--control-train-only"],
+        Step("hybrid_controle", "ia.hibrido.hybrid_classifier", ["--control-train-only"],
              skip_reason=None if control else f"já existe ({CONTROL_OUTPUTS[0]})"),
     ]
     return steps

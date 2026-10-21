@@ -12,9 +12,10 @@ Pipeline de IA:
            pela val_loss; cada etapa termina com os pesos da época de menor val_loss
         -> avaliação final no TESTE (nunca usado no treino nem na seleção de modelo)
 
-Uso:
-    python src/train_model.py
-    (requer data_split/ gerado por src/split_dataset.py)
+Uso (na raiz do repositório, com src/ no PYTHONPATH: no Linux "export PYTHONPATH=src",
+no PowerShell '$env:PYTHONPATH = "src"'):
+    python -m ia.cnn.train_model
+    (requer data_split/ gerado por src/dados/split_dataset.py)
 
 Gera:
     models/plant_disease_model.keras
@@ -39,13 +40,13 @@ from sklearn.metrics import (
 )
 from sklearn.utils.class_weight import compute_class_weight
 
-from config import (
+from common.config import (
     BATCH_SIZE, CLASS_NAMES_PATH, CNN_REPORTS_DIR, FINE_TUNE_EPOCHS, FINE_TUNE_LAYERS,
     FINE_TUNE_LR, HEAD_LR, INITIAL_EPOCHS, MODEL_IMG_SIZE, MODEL_PATH, MODELS_DIR, SEED,
     SPLIT_DIR,
 )
-from model_utils import build_model
-from utils import list_images, plot_confusion_matrix
+from ia.cnn.model_utils import build_model
+from common.utils import list_images, plot_confusion_matrix
 
 HISTORY_PATH = os.path.join(CNN_REPORTS_DIR, "training_history.png")
 REPORT_PATH = os.path.join(CNN_REPORTS_DIR, "classification_report.txt")

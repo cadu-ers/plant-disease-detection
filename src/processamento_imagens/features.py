@@ -10,7 +10,7 @@ Grupos de features (147 no total):
     d. Textura LBP (28): histogramas LBP uniformes (P=8,R=1) e (P=16,R=2).
 
 Uso:
-    from features import extract_handcrafted, feature_names
+    from processamento_imagens.features import extract_handcrafted, feature_names
     feats = extract_handcrafted(original_bgr_224, segmented, mask)
 
 Gera:
@@ -24,7 +24,7 @@ import numpy as np
 from scipy.stats import skew
 from skimage.feature import graycomatrix, graycoprops, local_binary_pattern
 
-from config import LOWER_LESION, UPPER_LESION
+from common.config import LOWER_LESION, UPPER_LESION
 
 # ---------- Parâmetros ----------
 H_BINS, S_BINS, V_BINS = 32, 16, 16

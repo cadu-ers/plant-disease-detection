@@ -3,7 +3,7 @@ Constantes compartilhadas do projeto: caminhos, tamanhos de imagem, seed e
 limiares de segmentação. Todos os scripts de src/ importam daqui.
 
 Uso:
-    from config import DATA_DIR, SEG_IMG_SIZE, ...
+    from common.config import DATA_DIR, SEG_IMG_SIZE, ...
 
 Gera:
     nada (módulo só de configuração)

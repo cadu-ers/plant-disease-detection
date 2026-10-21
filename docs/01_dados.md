@@ -9,7 +9,7 @@ Utilizamos um subconjunto do dataset, com as classes de **tomate** e
 
 ## Formato e resolução
 
-Resumo de todas as imagens de `data/`, gerado por `python src/data_overview.py`
+Resumo de todas as imagens de `data/`, gerado por `python -m dados.data_overview`
 ([`reports/pi/dados/resumo_dados.csv`](../reports/pi/dados/resumo_dados.csv)): são
 18.163 imagens em 13 classes, todas com **256x256 pixels**, em formato **JPEG**
 (lido do cabeçalho do arquivo; as extensões variam entre `.JPG`, `.jpg` e
@@ -28,7 +28,7 @@ da CNN compensa isso com `class_weight` balanceado e os SVMs com
 
 ## Split treino / validação / teste
 
-Divisão estratificada 70/15/15 (seed 42) feita por `python src/split_dataset.py`,
+Divisão estratificada 70/15/15 (seed 42) feita por `python -m dados.split_dataset`,
 registrada em `data_split/split_manifest.csv` e resumida em
 [`reports/pi/dados/split_summary.csv`](../reports/pi/dados/split_summary.csv). O conjunto de teste
 é fixo e nunca é usado no treino nem na escolha de hiperparâmetros.

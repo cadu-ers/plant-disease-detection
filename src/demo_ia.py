@@ -44,15 +44,15 @@ import tensorflow as tf  # noqa: E402
 if not VERBOSE:
     tf.get_logger().setLevel("ERROR")
 
-from config import (  # noqa: E402
+from common.config import (  # noqa: E402
     CLASS_NAMES_PATH, HYBRID_MODEL_PATH, IA_DEMO_DIR, MODEL_PATH, PI_DEMO_LAST_PATH,
 )
-from extract_features import (  # noqa: E402
+from ia.hibrido.extract_features import (  # noqa: E402
     build_embedding_extractor, decode_and_resize, handcrafted_one,
 )
-from features import feature_names  # noqa: E402
-from preprocessing import segment_image  # noqa: E402
-from utils import (  # noqa: E402
+from processamento_imagens.features import feature_names  # noqa: E402
+from processamento_imagens.preprocessing import segment_image  # noqa: E402
+from common.utils import (  # noqa: E402
     describe_image, load_manifest, pick_test_image, short_name, slide_style,
 )
 
@@ -232,8 +232,8 @@ def main():
 
     # TODO (sistema especialista): quando existir o extrator de medidas de lesão
     # (tamanho, cor, halo, aspecto encharcado etc. a partir da máscara de lesão),
-    # montar aqui os fatos da folha e chamar o motor de src/expert_system/
-    # (ver src/expert_system/diagnose.py), passando as probabilidades da CNN como
+    # montar aqui os fatos da folha e chamar o motor de src/ia/expert_system/
+    # (ver src/ia/expert_system/diagnose.py), passando as probabilidades da CNN como
     # evidência (campo cnn_prior), e acrescentar o diagnóstico e a explicação ao
     # quadro de texto e ao .txt.
 
