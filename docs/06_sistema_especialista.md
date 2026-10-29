@@ -2,6 +2,10 @@
 
 # Sistema especialista
 
+<!-- Ao editar este arquivo, atualize também docs_EN/06_expert_system.md -->
+
+**🇧🇷 Português** | [🇺🇸 English](docs_EN/06_expert_system.md)
+
 O projeto também possui um sistema especialista em [`src/ia/expert_system/`](../src/ia/expert_system/).
 Ele recebe fatos sobre a planta e aplica regras do tipo **SE... ENTÃO...**
 para ranquear doenças, calcular fatores de certeza e explicar o resultado.

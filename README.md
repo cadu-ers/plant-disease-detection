@@ -1,5 +1,9 @@
 # Detecção de Doenças em Folhas de Plantas
 
+<!-- Ao editar este arquivo, atualize também o README.en.md -->
+
+**🇧🇷 Português** | [🇺🇸 English](README.en.md)
+
 Pipeline de processamento de imagens integrado a um modelo de IA (transfer
 learning) para identificação de doenças em folhas de tomate e batata, a
 partir do dataset PlantVillage.

@@ -2,6 +2,10 @@
 
 # Pipeline de Processamento de Imagens e segmentação
 
+<!-- Ao editar este arquivo, atualize também docs_EN/02_segmentation.md -->
+
+**🇧🇷 Português** | [🇺🇸 English](docs_EN/02_segmentation.md)
+
 O projeto tem como objetivo identificar, a partir de uma imagem de folha,
 se a planta está saudável ou apresenta algum tipo de doença. O pipeline de
 processamento de imagens segue as etapas abaixo (1 a 4 em

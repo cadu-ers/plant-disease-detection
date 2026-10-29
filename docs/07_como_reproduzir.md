@@ -2,6 +2,10 @@
 
 # Como reproduzir
 
+<!-- Ao editar este arquivo, atualize também docs_EN/07_how_to_reproduce.md -->
+
+**🇧🇷 Português** | [🇺🇸 English](docs_EN/07_how_to_reproduce.md)
+
 ## Requisitos
 
 As dependências do projeto estão listadas em [`requirements.txt`](../requirements.txt).

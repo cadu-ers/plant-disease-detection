@@ -2,6 +2,10 @@
 
 # CNN (integração com IA)
 
+<!-- Ao editar este arquivo, atualize também docs_EN/04_cnn.md -->
+
+**🇧🇷 Português** | [🇺🇸 English](docs_EN/04_cnn.md)
+
 A saída do pipeline de processamento de imagens (imagens segmentadas)
 alimenta um modelo de classificação baseado em **transfer learning**
 (implementado em [`src/ia/cnn/train_model.py`](../src/ia/cnn/train_model.py)). O pipeline completo do projeto é:

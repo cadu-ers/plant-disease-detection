@@ -2,6 +2,10 @@
 
 # Classificador híbrido (CNN + features clássicas + SVM)
 
+<!-- Ao editar este arquivo, atualize também docs_EN/05_hybrid_classifier.md -->
+
+**🇧🇷 Português** | [🇺🇸 English](docs_EN/05_hybrid_classifier.md)
+
 Além da CNN, o projeto treina um classificador **SVM** que combina dois tipos
 de informação: os **embeddings** aprendidos pela CNN e **features clássicas**
 de processamento de imagens. Ele é comparado com a própria CNN no mesmo

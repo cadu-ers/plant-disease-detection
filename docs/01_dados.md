@@ -2,6 +2,10 @@
 
 # Dados
 
+<!-- Ao editar este arquivo, atualize também docs_EN/01_data.md -->
+
+**🇧🇷 Português** | [🇺🇸 English](docs_EN/01_data.md)
+
 - [PlantVillage Dataset (Kaggle)](https://www.kaggle.com/datasets/emmarex/plantdisease)
 
 Utilizamos um subconjunto do dataset, com as classes de **tomate** e

@@ -2,6 +2,10 @@
 
 # FFT (domínio da frequência)
 
+<!-- Ao editar este arquivo, atualize também docs_EN/03_fft.md -->
+
+**🇧🇷 Português** | [🇺🇸 English](docs_EN/03_fft.md)
+
 Implementado em [`src/processamento_imagens/fft_analysis.py`](../src/processamento_imagens/fft_analysis.py), com figuras em [`reports/pi/fft/`](../reports/pi/fft/).
 
 **Preparação de cada imagem**:
