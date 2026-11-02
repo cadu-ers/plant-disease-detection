@@ -171,9 +171,10 @@ def test_folha_ocupando_quase_tudo_e_suspeita():
 
 def test_fracao_dentro_da_faixa_e_confiavel():
     mask = np.zeros((224, 224), np.uint8)
-    mask[:, :112] = 255                                 # 50%
+    mask[33:191, 33:191] = 255                          # ~50%, longe das bordas
     q = avaliar_mascara(mask)
-    assert q.confiavel and q.motivo is None and q.leaf_fraction == pytest.approx(0.5)
+    assert q.confiavel and q.motivo is None
+    assert q.leaf_fraction == pytest.approx(0.5, abs=0.01)   # 158x158 = 49,75%
 
 
 def test_tamanhos_diferentes_levantam_erro_que_nao_e_mascara_invalida():
@@ -182,6 +183,38 @@ def test_tamanhos_diferentes_levantam_erro_que_nao_e_mascara_invalida():
     with pytest.raises(ValueError, match="tamanhos diferentes") as erro:
         medir_lesoes(img, mask)
     assert not isinstance(erro.value, MascaraInvalida)
+
+
+# --------------------------------------------------------- contato com as bordas
+def test_mascara_colada_nas_bordas_e_suspeita():
+    mask = np.zeros((224, 224), np.uint8)
+    mask[:, :140] = 255                                 # folha (62%) colada em 3 bordas
+    img, mask = _imagem_e_mascara(mask)
+    q = avaliar_mascara(mask)
+    assert q.suspeita and not q.confiavel and q.edge_contact >= config.MASK_EDGE_CONTACT_MAX
+    assert "fundo vazado" in q.motivo
+    with pytest.raises(MascaraInvalida, match="fundo vazado"):
+        medir_lesoes(img, mask)
+
+
+def test_mascara_centralizada_nao_e_marcada_pelas_bordas():
+    mask = np.zeros((224, 224), np.uint8)
+    mask[40:184, 40:184] = 255                          # ~41%, longe das bordas
+    q = avaliar_mascara(mask)
+    assert q.confiavel and q.motivo is None and q.edge_contact == 0.0
+
+
+def test_edge_contact_e_a_fracao_das_bordas_dentro_da_mascara():
+    mask = np.zeros((224, 224), np.uint8)
+    mask[60:164, :] = 255                               # faixa que cruza de lado a lado
+    q = avaliar_mascara(mask)
+    # bordas esquerda e direita: 104 de 222 px cada; topo e base: 0 -> 208 de 892 px
+    assert q.edge_contact == pytest.approx(208 / 892)
+
+
+def test_mascara_vazia_e_none_tem_edge_contact_padrao():
+    assert avaliar_mascara(np.zeros((224, 224), np.uint8)).edge_contact == 0.0
+    assert avaliar_mascara(None).edge_contact == 0.0
 
 
 # ------------------------------------------------------------------- configuração

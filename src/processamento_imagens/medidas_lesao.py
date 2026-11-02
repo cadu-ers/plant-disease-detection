@@ -33,6 +33,18 @@ Limitações conhecidas:
     - Não houve verificação com imagens reais do dataset; os testes usam folhas
       sintéticas.
 
+Limitações da checagem de máscara (avaliar_mascara):
+    - Recusa a máscara quando a fração das 4 bordas da imagem dentro dela é
+      >= MASK_EDGE_CONTACT_MAX (provável fundo vazado). Não detecta folha cortada
+      por sombra ou parte escura removida (erro "tipo b"). A solidez da máscara
+      (área / casco convexo) foi testada e descartada: folhas compostas, com
+      folíolos e cabo, têm solidez baixa naturalmente.
+    - Folhas que ocupam a foto inteira podem ser recusadas por engano (3 de 16
+      marcadas na amostra de 300 imagens).
+    - O limiar é provisório e foi escolhido em tomate; batata não foi testada
+      (0 de 44 marcadas).
+    - Fundo vazado leve escapa (ex.: Tomato Yellow Leaf Curl 322, borda 0,029).
+
 Uso:
     from processamento_imagens.preprocessing import segment_image
     from processamento_imagens.medidas_lesao import avaliar_mascara, medir_lesoes
@@ -52,7 +64,7 @@ import numpy as np
 
 from common.config import (
     LOWER_BROWN, LOWER_HEALTHY_GREEN, LOWER_YELLOW, MIN_LESION_AREA_PX,
-    SMALL_LESION_MAX_RATIO, SUSPECT_LEAF_FRACTION, UPPER_BROWN, UPPER_HEALTHY_GREEN,
+    MASK_EDGE_CONTACT_MAX, SMALL_LESION_MAX_RATIO, SUSPECT_LEAF_FRACTION, UPPER_BROWN, UPPER_HEALTHY_GREEN,
     UPPER_YELLOW,
 )
 
@@ -67,6 +79,7 @@ class QualidadeMascara:
     vazia: bool
     suspeita: bool
     motivo: Optional[str]         # texto para o usuário; None se a máscara é confiável
+    edge_contact: float = 0.0     # fração dos pixels das 4 bordas da imagem dentro da máscara
 
     @property
     def confiavel(self):
@@ -84,27 +97,42 @@ class MedidasLesao:
     leaf_fraction: float
 
 
+def _edge_contact(inside):
+    """Fração dos pixels das 4 bordas da imagem que estão dentro da máscara."""
+    edge = np.concatenate([inside[0], inside[-1], inside[1:-1, 0], inside[1:-1, -1]])
+    return float(edge.mean())
+
+
 def avaliar_mascara(mask):
     """Diz se a máscara da folha (uint8, 0 = fundo) é confiável para medir.
 
-    É um indicador indireto: a máscara é vazia, ou a folha ocupa uma fração da
-    imagem fora da faixa usual (possível falha de segmentação ou vazamento do fundo).
-    Não é uma medida de qualidade da segmentação.
+    É um indicador indireto: a máscara é vazia, a folha ocupa uma fração da imagem
+    fora da faixa usual, ou a máscara toca demais as bordas da imagem (possível
+    falha de segmentação ou vazamento do fundo). Não é uma medida de qualidade
+    da segmentação.
     """
     if mask is None or mask.size == 0 or not (mask > 0).any():
         return QualidadeMascara(0.0, True, False, "máscara vazia: nenhuma folha segmentada")
-    fraction = float((mask > 0).mean())
+    inside = mask > 0
+    fraction = float(inside.mean())
+    edge = _edge_contact(inside)
     low, high = SUSPECT_LEAF_FRACTION
     if fraction < low:
         return QualidadeMascara(
             fraction, False, True,
-            f"a folha ocupa só {fraction:.0%} da imagem (suspeito: menos de {low:.0%})")
+            f"a folha ocupa só {fraction:.0%} da imagem (suspeito: menos de {low:.0%})",
+            edge)
     if fraction > high:
         return QualidadeMascara(
             fraction, False, True,
             f"a folha ocupa {fraction:.0%} da imagem (suspeito: mais de {high:.0%}); "
-            "possível vazamento do fundo")
-    return QualidadeMascara(fraction, False, False, None)
+            "possível vazamento do fundo", edge)
+    if edge >= MASK_EDGE_CONTACT_MAX:
+        return QualidadeMascara(
+            fraction, False, True,
+            f"{edge:.0%} das bordas da imagem estão dentro da máscara (suspeito: "
+            f"{MASK_EDGE_CONTACT_MAX:.0%} ou mais); possível fundo vazado", edge)
+    return QualidadeMascara(fraction, False, False, None, edge)
 
 
 def _in_range(hsv, lower, upper):

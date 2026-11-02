@@ -126,3 +126,9 @@ SMALL_LESION_MAX_RATIO = 0.005
 # segmentation_report.py (copiados, não importados: aquele módulo fixa o backend
 # do matplotlib ao ser importado).
 SUSPECT_LEAF_FRACTION = (0.10, 0.95)
+
+# Fração dos pixels das 4 bordas da imagem que estão dentro da máscara. Igual ou
+# acima disto a máscara é suspeita (provável fundo bege/marrom vazado) e as medidas
+# não são calculadas. PROVISÓRIO: escolhido em 65 imagens de tomate (e conferido em
+# 300, também quase só tomate); batata não foi avaliada.
+MASK_EDGE_CONTACT_MAX = 0.20
