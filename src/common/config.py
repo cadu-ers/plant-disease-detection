@@ -40,6 +40,7 @@ DEMO_DIR = "rotina_demo"             # saídas das rotinas de demonstração (n�
 PI_DEMO_DIR = os.path.join(DEMO_DIR, "pi")                  # demo_pi.py
 PI_DEMO_LAST_PATH = os.path.join(PI_DEMO_DIR, "ultima.json")  # último resultado do demo_pi (lido pelo demo_ia --ultima-pi)
 IA_DEMO_DIR = os.path.join(DEMO_DIR, "ia")                  # demo_ia.py
+CLI_DEMO_DIR = os.path.join(DEMO_DIR, "cli")                # figuras da CLI de diagnóstico (aplicacao/exportacao.py)
 FEATURES_DIR = "features_cache"      # features extraídas (handcrafted + embeddings da CNN)
 
 MODEL_PATH = os.path.join(MODELS_DIR, "plant_disease_model.keras")
