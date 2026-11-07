@@ -18,6 +18,7 @@ from aplicacao import exportacao
 from aplicacao.exportacao import ResultadoGravacao, salvar_figuras
 from aplicacao.pipeline import ResultadoDiagnostico
 from common.config import CLI_DEMO_DIR, SEG_IMG_SIZE
+from conftest import listar_pastas, pastas_novas
 
 SRC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RAIZ = Path(SRC_DIR).parent
@@ -214,8 +215,28 @@ def test_caminho_padrao_parte_da_raiz_do_repositorio(tmp_path, monkeypatch):
     assert gravadas == [RAIZ / CLI_DEMO_DIR] and gravadas[0].is_absolute()
 
 
-def test_os_testes_nao_gravam_em_rotina_demo_cli():
-    assert not (RAIZ / CLI_DEMO_DIR).exists() or not any((RAIZ / CLI_DEMO_DIR).iterdir())
+def test_os_testes_nao_gravam_em_rotina_demo_cli(pastas_cli_iniciais):
+    # Pastas que já existiam antes da suíte (execuções reais) são permitidas; nova, não.
+    # O conftest repete esta conferência quando a suíte termina.
+    assert pastas_novas(RAIZ / CLI_DEMO_DIR, pastas_cli_iniciais) == []
+
+
+def test_comparacao_de_pastas_sem_mudanca_passa(tmp_path):
+    (tmp_path / "antiga").mkdir()
+    (tmp_path / "arquivo.txt").write_text("x")               # arquivos não contam
+    assert pastas_novas(tmp_path, listar_pastas(tmp_path)) == []
+
+
+def test_comparacao_de_pastas_com_pasta_nova_falha(tmp_path):
+    (tmp_path / "antiga").mkdir()
+    antes = listar_pastas(tmp_path)
+    (tmp_path / "nova").mkdir()
+    assert pastas_novas(tmp_path, antes) == ["nova"]
+
+
+def test_comparacao_de_pastas_com_base_inexistente(tmp_path):
+    assert listar_pastas(tmp_path / "nao_existe") == frozenset()
+    assert pastas_novas(tmp_path / "nao_existe", frozenset()) == []
 
 
 def test_importar_o_modulo_nao_carrega_tensorflow():
