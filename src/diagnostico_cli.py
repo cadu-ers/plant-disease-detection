@@ -16,8 +16,11 @@ Gera (em rotina_demo/cli/AAAAMMDD_HHMMSS_<hex>/, ignorada pelo Git, sem apagar n
 
 import os
 
-# Antes de qualquer import pesado: o TensorFlow lê esta variável ao ser importado.
+# Antes de qualquer import pesado: o TensorFlow e o OpenCV leem estas variáveis ao ser importados.
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
+# Sem isto, cv2.imread de um arquivo que não abre escreve o CAMINHO no stderr (com a pasta da
+# classe) antes da revelação. "ERROR" ainda mostra erros graves, mas não esse aviso.
+os.environ.setdefault("OPENCV_LOG_LEVEL", "ERROR")
 
 import sys  # noqa: E402
 

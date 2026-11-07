@@ -14,8 +14,8 @@ igual nem caracteres de desenhar caixas.
 Legendas das medidas (conferidas em processamento_imagens/medidas_lesao.py):
     - as proporções têm como base a ÁREA DA FOLHA segmentada (a máscara), não a imagem toda;
     - "fora do verde saudável" (frac_lesao_total) inclui marrom, amarelo, pálido e sombra;
-    - as "regiões marrons" são componentes conexos da faixa de cor marrom, e não uma
-      segmentação de lesão validada;
+    - as "regiões marrons" são componentes conexos da faixa de cor marrom com pelo menos
+      MIN_LESION_AREA_PX pixels, e não uma segmentação de lesão validada;
     - a distância à borda vai de 0 (na borda da FOLHA) a 1 (ponto mais interno da folha) e é a
       média só dos pixels das regiões marrons; não existe sem região marrom.
 """
@@ -24,7 +24,7 @@ import textwrap
 from pathlib import Path
 
 from aplicacao.pipeline import AVISO_CF
-from common.config import SMALL_LESION_MAX_RATIO
+from common.config import MIN_LESION_AREA_PX, SMALL_LESION_MAX_RATIO
 
 LARGURA = 78
 
@@ -210,11 +210,11 @@ def _secao_medidas(diag):
         "    Legenda:",
         _item("As proporções são da área da folha segmentada, não da imagem inteira.", 6),
         _item('"Fora do verde saudável" inclui marrom, amarelo, pixels pálidos e sombras.', 6),
-        _item("Regiões marrons: grupos de pixels da faixa de cor marrom (candidatas a lesão; "
-              "não é uma segmentação de lesão validada). Pequenas: até "
-              f"{SMALL_LESION_MAX_RATIO:.1%} da área da folha.", 6),
+        _item("Regiões marrons: grupos de pixels da faixa de cor marrom com pelo menos "
+              f"{MIN_LESION_AREA_PX} pixels (candidatas a lesão; não é uma segmentação de lesão "
+              f"validada). Pequenas: até {SMALL_LESION_MAX_RATIO:.1%} da área da folha.", 6),
         _item("Distância à borda: 0 = na borda da folha, 1 = ponto mais interno da folha "
-              "(média das regiões marrons).", 6),
+              "(média dos pixels das regiões marrons).", 6),
     ]
     return linhas
 
@@ -351,8 +351,7 @@ def formatar_revelacao(imagem, diag, comparacao, gravacao, seed, kb, raiz=None):
         linhas.append(_paragrafo(f"As figuras NÃO foram salvas: {erro}", recuo=0))
         if gravacao is not None and gravacao.pasta is not None:
             linhas.append(_campo("Pasta criada", _caminho_curto(gravacao.pasta, raiz), quebrar=False))
-    linhas.append(_campo("Seed", f"{seed} (repete a mesma imagem enquanto o manifest não "
-                                    "mudar)"))
+    linhas.append(_campo("Seed", f"{seed} (identifica este sorteio)"))
     if diag.top3_cnn:
         linhas.append(_paragrafo(
             "Lembrete: esta comparação é só uma demonstração, não uma avaliação da CNN: os pesos "

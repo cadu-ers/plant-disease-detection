@@ -24,8 +24,8 @@ from cli import formatacao as fmt
 from cli import menu
 from cli.menu import Dependencias, executar
 from ia.expert_system import carregar_kb
+from common.config import MIN_LESION_AREA_PX
 from ia.inferencia import AVISO_PESOS_LOCAIS, ModeloIndisponivel
-from processamento_imagens.preprocessing import segment_image
 
 SRC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CLASSES = list(carregar_class_names())
@@ -178,8 +178,25 @@ def test_legendas_das_medidas_seguem_o_codigo_de_medidas_lesao(projeto, kb):
     assert "Fora do verde saudável" in antes and "inclui marrom, amarelo" in antes
     assert "área da folha segmentada, não da imagem inteira" in antes
     assert "0 = na borda da folha, 1 = ponto mais interno da folha" in antes
+    assert "(média dos pixels das regiões marrons)" in antes          # média por pixel
     assert "não é uma segmentação de lesão validada" in antes
+    assert f"com pelo menos {MIN_LESION_AREA_PX} pixels" in antes        # lido do config
     assert "qualquer cor" not in antes and "centro" not in antes
+
+
+def test_o_minimo_de_pixels_da_legenda_vem_do_config(projeto, kb, monkeypatch):
+    monkeypatch.setattr(fmt, "MIN_LESION_AREA_PX", 987)
+    t = Terminal(*FLUXO)
+    rodar(t, deps_de_teste(projeto, kb))
+    assert "com pelo menos 987 pixels" in t.antes_do_enter()
+
+
+def test_a_seed_so_identifica_o_sorteio_sem_prometer_reproducao(projeto, kb):
+    t = Terminal(*FLUXO)
+    rodar(t, deps_de_teste(projeto, kb))
+    depois = t.depois_do_enter()
+    assert f"Seed: {SEED} (identifica este sorteio)" in depois
+    assert "repete" not in depois and "demo_ia" not in depois
 
 
 def test_conclusao_diz_se_e_conclusiva_e_explica_o_motivo(projeto, kb):
@@ -578,6 +595,7 @@ def test_banners_tem_acentos():
 def rodar_python(codigo, env_extra=None, entrada=None):
     env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}
     env.pop("TF_CPP_MIN_LOG_LEVEL", None)
+    env.pop("OPENCV_LOG_LEVEL", None)
     env.update(env_extra or {})
     return subprocess.run([sys.executable, "-c", codigo, SRC_DIR], capture_output=True,
                           text=True, encoding="utf-8", env=env, input=entrada)
@@ -602,6 +620,27 @@ def test_abrir_o_menu_e_sair_nao_carrega_tensorflow_e_ajusta_o_log(previa, esper
     resultado = rodar_python(codigo, extra)
     assert resultado.returncode == 0, resultado.stderr
     assert "Até logo." in resultado.stdout
+
+
+@pytest.mark.parametrize("previa, esperado", [(None, "ERROR"), ("INFO", "INFO")])
+def test_o_ponto_de_entrada_define_o_log_do_opencv_antes_de_importar_cv2(previa, esperado):
+    codigo = ("import sys; sys.path.insert(0, sys.argv[1]); "
+              "assert 'cv2' not in sys.modules; import diagnostico_cli, os; "
+              f"assert os.environ['OPENCV_LOG_LEVEL'] == {esperado!r}; "
+              "assert 'cv2' not in sys.modules, 'importou cv2 antes da hora'")
+    extra = {"OPENCV_LOG_LEVEL": previa} if previa else None
+    resultado = rodar_python(codigo, extra)
+    assert resultado.returncode == 0, resultado.stderr
+
+
+def test_com_o_ponto_de_entrada_o_imread_nao_escreve_o_caminho_no_stderr(tmp_path):
+    # Sem OPENCV_LOG_LEVEL, cv2.imread de um arquivo que não abre escreve o caminho no stderr.
+    isca = tmp_path / "Tomato_ISCA" / "ISCA_ARQUIVO.JPG"               # não existe: nada é criado
+    codigo = ("import sys; sys.path.insert(0, sys.argv[1]); import diagnostico_cli, cv2; "
+              f"assert cv2.imread({str(isca)!r}) is None")
+    resultado = rodar_python(codigo)
+    assert resultado.returncode == 0, resultado.stderr
+    assert "ISCA" not in resultado.stderr and "imread" not in resultado.stderr
 
 
 def test_rodar_o_script_direto_abre_o_menu_e_sai_com_zero():
