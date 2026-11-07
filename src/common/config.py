@@ -40,6 +40,7 @@ DEMO_DIR = "rotina_demo"             # saídas das rotinas de demonstração (n�
 PI_DEMO_DIR = os.path.join(DEMO_DIR, "pi")                  # demo_pi.py
 PI_DEMO_LAST_PATH = os.path.join(PI_DEMO_DIR, "ultima.json")  # último resultado do demo_pi (lido pelo demo_ia --ultima-pi)
 IA_DEMO_DIR = os.path.join(DEMO_DIR, "ia")                  # demo_ia.py
+CLI_DEMO_DIR = os.path.join(DEMO_DIR, "cli")                # figuras da CLI de diagnóstico (aplicacao/exportacao.py)
 FEATURES_DIR = "features_cache"      # features extraídas (handcrafted + embeddings da CNN)
 
 MODEL_PATH = os.path.join(MODELS_DIR, "plant_disease_model.keras")
@@ -99,3 +100,36 @@ UPPER_LESION = np.array([35, 255, 255])
 
 # Área mínima (fração da imagem) para aceitar o maior contorno como a folha.
 MIN_LEAF_AREA_RATIO = 0.05
+
+# ---------- Medidas de lesão (sistema especialista) ----------
+# Usadas por processamento_imagens/medidas_lesao.py. São proporções de pixels por
+# FAIXA DE COR, não uma segmentação de lesão validada (não há máscaras de
+# referência). Derivam das faixas de segmentação acima, para existir uma única
+# fonte de verdade: o matiz H é dividido em três partes que não se sobrepõem.
+#   marrom : H 8–24   (de LOWER_LESION até antes do verde), S/V mínimos da lesão
+#   amarelo: H 25–35  (faixa em que as máscaras de verde e de lesão se sobrepõem),
+#            S/V mínimos do verde
+#   verde  : H 36–90  (depois da lesão até o fim do verde), S/V mínimos do verde
+# Pixels fora das três (pálidos, S < 40, ou escuros) contam só na lesão total.
+LOWER_BROWN = np.array([LOWER_LESION[0], LOWER_LESION[1], LOWER_LESION[2]])
+UPPER_BROWN = np.array([LOWER_GREEN[0] - 1, 255, 255])
+LOWER_YELLOW = np.array([LOWER_GREEN[0], LOWER_GREEN[1], LOWER_GREEN[2]])
+UPPER_YELLOW = np.array([UPPER_LESION[0], 255, 255])
+LOWER_HEALTHY_GREEN = np.array([UPPER_LESION[0] + 1, LOWER_GREEN[1], LOWER_GREEN[2]])
+UPPER_HEALTHY_GREEN = np.array([UPPER_GREEN[0], 255, 255])
+
+# Componente marrom com menos pixels que isto é tratado como ruído, não como lesão.
+MIN_LESION_AREA_PX = 6
+# Lesão "pequena": área até esta fração da área da folha (valor provisório).
+SMALL_LESION_MAX_RATIO = 0.005
+# Fração da imagem ocupada pela folha fora desta faixa torna a máscara suspeita e
+# as medidas não são calculadas. Mesmos limites de SUSPECT_LOW/SUSPECT_HIGH em
+# segmentation_report.py (copiados, não importados: aquele módulo fixa o backend
+# do matplotlib ao ser importado).
+SUSPECT_LEAF_FRACTION = (0.10, 0.95)
+
+# Fração dos pixels das 4 bordas da imagem que estão dentro da máscara. Igual ou
+# acima disto a máscara é suspeita (provável fundo bege/marrom vazado) e as medidas
+# não são calculadas. PROVISÓRIO: escolhido em 65 imagens de tomate (e conferido em
+# 300, também quase só tomate); batata não foi avaliada.
+MASK_EDGE_CONTACT_MAX = 0.20
