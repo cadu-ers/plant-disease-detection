@@ -12,3 +12,5 @@ joblib==1.6.0
 kagglehub==1.0.2
 # Base de conhecimento do sistema especialista
 PyYAML==6.0.3
+# IA generativa: cliente do Gemini (src/ia/generativa/)
+google-genai==2.33.0

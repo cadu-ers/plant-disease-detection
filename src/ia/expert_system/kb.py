@@ -1,8 +1,12 @@
 """Carrega e valida a base de conhecimento (knowledge_base.yaml).
 
 Como o YAML será editado à mão, a validação é estrita: sintoma ou doença
-inexistente numa regra, CF fora de [-1, 1] ou id duplicado geram ValueError
-com uma mensagem apontando o problema.
+inexistente numa regra, CF fora de [-1, 1], id duplicado ou campo de texto que
+não é string geram ValueError com uma mensagem apontando o problema.
+
+O caso do texto pega um erro comum de YAML: uma linha como
+"- Não há cura: remover..." sem aspas é lida como o dicionário
+{'Não há cura': 'remover...'}, e não como texto.
 """
 
 from dataclasses import dataclass, field
@@ -73,11 +77,33 @@ def carregar_kb(caminho=None):
         return kb_de_dict(yaml.safe_load(f))
 
 
+_DICA_ASPAS = 'se o texto tem ": ", coloque-o entre aspas duplas no YAML'
+
+
+def _texto(valor, onde, campo):
+    """Garante que um campo de texto da KB é str; senão, ValueError claro."""
+    if not isinstance(valor, str):
+        raise ValueError(f"{onde}: campo {campo!r} deve ser texto, veio "
+                         f"{type(valor).__name__} {valor!r} ({_DICA_ASPAS})")
+    return valor
+
+
+def _textos(valores, onde, campo):
+    """Lista de textos (ex.: recomendacoes): a lista e cada item precisam ser str."""
+    if valores is None:
+        return ()
+    if not isinstance(valores, list):
+        raise ValueError(f"{onde}: campo {campo!r} deve ser uma lista de textos, "
+                         f"veio {type(valores).__name__} {valores!r}")
+    return tuple(_texto(v, onde, f"{campo}[{i}]") for i, v in enumerate(valores))
+
+
 def kb_de_dict(dados):
     config = {**CONFIG_PADRAO, **(dados.get("config") or {})}
 
     sintomas = {}
     for sid, s in (dados.get("sintomas") or {}).items():
+        onde = f"Sintoma {sid}"
         origem = s.get("origem")
         if origem not in ORIGENS:
             raise ValueError(f"Sintoma {sid}: origem deve ser uma de {ORIGENS}, veio {origem!r}")
@@ -90,18 +116,23 @@ def kb_de_dict(dados):
                 raise ValueError(f"Sintoma {sid}: trapezio sem 'medida'")
         if not s.get("pergunta"):
             raise ValueError(f"Sintoma {sid}: falta 'pergunta' (usada no modo interativo)")
-        sintomas[sid] = Sintoma(sid, s.get("descricao", ""), origem, s["pergunta"],
+        sintomas[sid] = Sintoma(sid, _texto(s.get("descricao", ""), onde, "descricao"),
+                                origem, _texto(s["pergunta"], onde, "pergunta"),
                                 s.get("medida"), trap)
 
     doencas = {}
     for did, d in (dados.get("doencas") or {}).items():
+        onde = f"Doença {did}"
         if d.get("cultura") not in CULTURAS:
             raise ValueError(f"Doença {did}: cultura deve ser uma de {CULTURAS}")
+        if "nome" not in d:
+            raise ValueError(f"Doença {did}: falta o campo 'nome'")
         doencas[did] = Doenca(
-            id=did, nome=d["nome"], cultura=d["cultura"], agente=d.get("agente", ""),
+            id=did, nome=_texto(d["nome"], onde, "nome"), cultura=d["cultura"],
+            agente=_texto(d.get("agente", ""), onde, "agente"),
             urgencia=d.get("urgencia", "media"),
             confundivel_com=tuple(d.get("confundivel_com") or ()),
-            recomendacoes=tuple(d.get("recomendacoes") or ()),
+            recomendacoes=_textos(d.get("recomendacoes"), onde, "recomendacoes"),
         )
     for d in doencas.values():
         for outra in d.confundivel_com:
@@ -132,6 +163,7 @@ def kb_de_dict(dados):
             raise ValueError(f"Regra {rid}: cf deve estar em [-1, 1] e ser diferente de 0")
         if not r.get("porque"):
             raise ValueError(f"Regra {rid}: falta o campo 'porque' (usado na explicação)")
-        regras.append(Regra(rid, se, se_nao, hips, cf, r["porque"].strip()))
+        porque = _texto(r["porque"], f"Regra {rid}", "porque")
+        regras.append(Regra(rid, se, se_nao, hips, cf, porque.strip()))
 
     return BaseConhecimento(config, sintomas, doencas, regras)

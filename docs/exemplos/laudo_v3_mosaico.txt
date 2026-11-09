@@ -1,0 +1,111 @@
+# Laudo v3 - folha de mosaico (seed 594525008), saída real do CLI em 09/11/2026
+# Prompt v3: saída em JSON + guardrail v2 (aprovado na 1a tentativa). Problema: o Gemini escreveu sem acentos no modo JSON.
+
+==============================================================================
+      Diagnóstico de doenças em folhas de tomate e batata - demonstração      
+==============================================================================
+  1) Analisar imagem aleatória
+  0) Sair
+Escolha uma opção: 1
+
+Imagem sorteada do conjunto de teste.
+Divisão: test
+Carregando modelo (pode levar alguns segundos)...
+Modelo carregado.
+Analisando...
+
+================================ DIAGNÓSTICO =================================
+
+[1] CNN - 3 classes mais prováveis
+    (saída do softmax: pontuação relativa do modelo, não é confiança
+    calibrada)
+    1. Vírus do mosaico do tomateiro (ToMV)                       100.0%
+    2. Mofo-da-folha do tomateiro (Leaf mold)                       0.0%
+    3. Ácaro-rajado (Two-spotted spider mite)                       0.0%
+
+[2] Medidas da folha
+    Máscara: confiável (a folha ocupa 26% da imagem; 0% das bordas da imagem
+    estão dentro da máscara).
+    Fora do verde saudável ............ 1%
+    Faixa de cor marrom ............... 0%
+    Faixa de cor amarela .............. 0%
+    Regiões marrons ................... 1 (pequenas: 1)
+    Distância média à borda da folha .. 0.02
+    Legenda:
+      - As proporções são da área da folha segmentada, não da imagem inteira.
+      - "Fora do verde saudável" inclui marrom, amarelo, pixels pálidos e
+        sombras.
+      - Regiões marrons: grupos de pixels da faixa de cor marrom com pelo
+        menos 6 pixels (candidatas a lesão; não é uma segmentação de lesão
+        validada). Pequenas: até 0.5% da área da folha.
+      - Distância à borda: 0 = na borda da folha, 1 = ponto mais interno da
+        folha (média dos pixels das regiões marrons).
+
+[3] Avisos
+    - Aviso sobre a CNN: os pesos locais (models/plant_disease_model.keras)
+      foram gravados antes da divisão 70/15/15, então o modelo pode ter visto
+      imagens do split de teste e parecer melhor do que é. Eles também foram
+      treinados com a segmentação antiga, diferente da atual, o que pode
+      piorar as previsões. Não use este resultado para avaliar a CNN.
+    - cultura inferida pela CNN: tomate.
+
+[4] Regras disparadas
+    Nenhuma regra disparou com os dados disponíveis.
+
+[5] Informações que ajudariam a decidir
+    (a CLI não pergunta: você não viu a foto)
+    - Mais útil: A folha tem um mosqueado (mosaico) de verde claro e escuro?
+    - As folhas estão deformadas, estreitas ou menores que o normal?
+
+[6] Conclusão
+    Hipótese principal: Vírus do mosaico do tomateiro (ToMV)  (CF = 0.49)
+    Situação: NÃO CONCLUSIVA
+    Motivo: o CF (0.49) está abaixo do mínimo de 0.60 para concluir.
+    O CF (fator de certeza) do sistema especialista não é uma probabilidade
+    calibrada: serve para ordenar hipóteses, não para medir chance de acerto.
+
+[7] Explicação do sistema especialista
+    Diagnóstico mais provável: Vírus do mosaico do tomateiro (ToMV)
+    Confiança (CF): 0.49 [INCONCLUSIVO]
+    Agente: Tobamovirus (vírus, transmissão mecânica e por sementes)
+
+    Por quê:
+      - CNN (p=0.99, CF +0.49): Probabilidade atribuída pela CNN a esta
+        classe.
+
+    Resultado inconclusivo: responda às perguntas sugeridas ou procure
+      avaliação de um agrônomo.
+
+    Recomendações gerais (urgência: alta):
+      - Não há cura: remover e destruir plantas infectadas.
+      - Higienizar mãos e ferramentas e usar sementes certificadas.
+      - Procurar orientação técnica sobre variedades resistentes.
+      - Esta é uma orientação geral e não substitui a avaliação de um
+        agrônomo.
+
+Gerando o laudo em linguagem simples (IA generativa)...
+================= LAUDO EM LINGUAGEM SIMPLES (IA GENERATIVA) =================
+Texto gerado pelo Gemini (modelo gemini-3.5-flash-lite) só a partir do
+diagnóstico acima. É texto de IA e pode conter erros: confira com as seções
+[1] a [7]. Quem decide o diagnóstico é o sistema especialista.
+Guardrail: aprovado na 1a tentativa
+
+    O que o sistema encontrou:
+      O sistema nao tem certeza sobre o diagnostico porque a forca das
+      evidencias ficou abaixo do minimo necessario para concluir. A hipotese
+      levantada e para Virus do mosaico do tomateiro (ToMV).
+
+    Por quê:
+      A analise da foto aponta essa hipotese, mas nenhuma regra confirmou: os
+      sinais medidos na folha nao mostram os sintomas tipicos e nenhuma regra
+      disparou.
+
+    Perguntas para você:
+      - A folha tem um mosqueado (mosaico) de verde claro e escuro?
+      - As folhas estao deformadas, estreitas ou menores que o normal?
+
+    O que fazer:
+      Se o diagnostico for confirmado por um tecnico, remova e destrua plantas
+      infectadas. Higienize maos e ferramentas, use sementes certificadas e
+      procure orientacao sobre variedades resistentes. Lembre-se de confirmar
+      tudo com um agronomo ou tecnico agricola.

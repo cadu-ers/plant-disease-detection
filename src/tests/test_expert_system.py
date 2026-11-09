@@ -66,6 +66,71 @@ def test_kb_rejeita_cf_fora_do_intervalo_e_id_duplicado():
         kb_de_dict(dup)
 
 
+def test_kb_real_tem_todos_os_campos_de_texto_como_str(kb):
+    for s in kb.sintomas.values():
+        assert isinstance(s.descricao, str) and isinstance(s.pergunta, str), s.id
+    for d in kb.doencas.values():
+        assert isinstance(d.nome, str) and isinstance(d.agente, str), d.id
+        assert d.recomendacoes and all(isinstance(r, str) for r in d.recomendacoes), d.id
+    for r in kb.regras:
+        assert isinstance(r.porque, str), r.id
+    # As duas recomendações que o YAML lia como dicionário voltaram a ser texto.
+    assert kb.doencas["tomate_mosaic"].recomendacoes[0].startswith("Não há cura: ")
+    assert kb.doencas["tomate_yellow_leaf_curl"].recomendacoes[0].startswith("Não há cura: ")
+
+
+KB_MINIMA_SEM_ASPAS = """
+sintomas:
+  mancha:
+    descricao: manchas na folha
+    origem: usuario
+    pergunta: Há manchas na folha?
+doencas:
+  tomate_mosaic:
+    nome: Mosaico
+    cultura: tomate
+    agente: vírus
+    confundivel_com: []
+    recomendacoes:
+      - Texto: outro
+regras:
+  - id: R01
+    se: [mancha]
+    entao: {hipoteses: [tomate_mosaic], cf: 0.5}
+    porque: Há manchas.
+"""
+
+
+def test_kb_rejeita_recomendacao_lida_como_dicionario():
+    dados = yaml.safe_load(KB_MINIMA_SEM_ASPAS)
+    assert dados["doencas"]["tomate_mosaic"]["recomendacoes"][0] == {"Texto": "outro"}
+    with pytest.raises(ValueError, match=r"Doença tomate_mosaic: campo 'recomendacoes\[0\]'"):
+        kb_de_dict(dados)
+
+
+@pytest.mark.parametrize("secao, chave, campo", [
+    ("sintomas", "mancha", "pergunta"),
+    ("sintomas", "mancha", "descricao"),
+    ("doencas", "tomate_mosaic", "nome"),
+    ("doencas", "tomate_mosaic", "agente"),
+])
+def test_kb_rejeita_outros_campos_de_texto_que_nao_sao_str(secao, chave, campo):
+    dados = yaml.safe_load(KB_MINIMA_SEM_ASPAS)
+    dados["doencas"]["tomate_mosaic"]["recomendacoes"] = ["Texto ok."]
+    assert kb_de_dict(copy.deepcopy(dados))  # a base mínima corrigida carrega
+    dados[secao][chave][campo] = {"Texto": "outro"}
+    with pytest.raises(ValueError, match=f"campo '{campo}'"):
+        kb_de_dict(dados)
+
+
+def test_kb_rejeita_porque_que_nao_e_str():
+    dados = yaml.safe_load(KB_MINIMA_SEM_ASPAS)
+    dados["doencas"]["tomate_mosaic"]["recomendacoes"] = ["Texto ok."]
+    dados["regras"][0]["porque"] = {"Porque": "sim"}
+    with pytest.raises(ValueError, match="Regra R01: campo 'porque'"):
+        kb_de_dict(dados)
+
+
 # ------------------------------------------------------------- álgebra de CF
 def test_combinar_cf_propriedades():
     assert combinar_cf(0.5, 0.5) == pytest.approx(0.75)

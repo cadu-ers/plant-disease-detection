@@ -25,6 +25,7 @@ from pathlib import Path
 
 from aplicacao.pipeline import AVISO_CF
 from common.config import MIN_LESION_AREA_PX, SMALL_LESION_MAX_RATIO
+from ia.generativa.prompts import TITULOS_LAUDO
 
 LARGURA = 78
 
@@ -37,6 +38,7 @@ MSG_RESPOSTA_INVALIDA = "Resposta inválida. Digite s (sim) ou n (não)."
 MSG_CARREGANDO_MODELO = "Carregando modelo (pode levar alguns segundos)..."
 MSG_MODELO_CARREGADO = "Modelo carregado."
 MSG_ANALISANDO = "Analisando..."
+MSG_GERANDO_LAUDO = "Gerando o laudo em linguagem simples (IA generativa)..."
 MSG_ATE_LOGO = "Até logo."
 MSG_ENCERRANDO = "Encerrando."
 # Genérica de propósito: o texto original da exceção pode trazer caminho ou nome de arquivo.
@@ -357,3 +359,118 @@ def formatar_revelacao(imagem, diag, comparacao, gravacao, seed, kb, raiz=None):
             "Lembrete: esta comparação é só uma demonstração, não uma avaliação da CNN: os pesos "
             "locais podem ter visto imagens do teste (veja o aviso).", recuo=0))
     return "\n".join(linhas)
+
+
+def formatar_laudo(laudo):
+    """Laudo da IA generativa (ia/generativa/laudo.py). Também é mostrado ANTES do Enter: o
+    laudo é gerado só a partir do ResultadoDiagnostico, que não tem caminho nem classe real."""
+    linhas = [_titulo("LAUDO EM LINGUAGEM SIMPLES (IA GENERATIVA)")]
+    guardrail = formatar_guardrail(laudo)
+    if laudo.status_guardrail == "reprovado":
+        linhas += [guardrail, "", _quebrar_linhas(laudo.texto, recuo=4)]
+        return "\n".join(linhas)
+    if laudo.fonte != "llm":
+        linhas.append(_paragrafo(
+            f"IA generativa indisponível nesta análise ({laudo.aviso}). A explicação do sistema "
+            "especialista está na seção [7] acima.", recuo=0))
+        return "\n".join(linhas)
+    linhas.append(_paragrafo(
+        f"Texto gerado pelo Gemini (modelo {laudo.modelo}) só a partir do diagnóstico acima. "
+        "É texto de IA e pode conter erros: confira com as seções [1] a [7]. Quem decide o "
+        "diagnóstico é o sistema especialista.", recuo=0))
+    if guardrail:
+        linhas.append(guardrail)
+    if laudo.doencas_fora_dos_fatos:
+        alerta = ("ATENÇÃO: o texto abaixo cita doença(s) que NÃO estão no diagnóstico ("
+                  + "; ".join(laudo.doencas_fora_dos_fatos) + "). Desconsidere essa parte.")
+        # sem quebrar nomes com hífen ("Ácaro-rajado") no meio
+        linhas += ["", textwrap.fill(alerta, width=LARGURA, break_long_words=False,
+                                     break_on_hyphens=False)]
+    linhas += ["", _blocos_do_laudo(laudo.texto)]
+    return "\n".join(linhas)
+
+
+def formatar_guardrail(laudo):
+    """Linha do guardrail (ia/generativa/guardrail.py), ou "" quando ele não rodou.
+
+    As violações são textos curtos gerados pelo código (nomes de campo, índices e nomes de
+    doença da base), nunca texto livre do LLM: podem aparecer antes do Enter."""
+    status = getattr(laudo, "status_guardrail", None)
+    violacoes = "; ".join(getattr(laudo, "violacoes", ()) or ())
+    if status == "aprovado":
+        texto = f"Guardrail: aprovado na {laudo.tentativas}a tentativa"
+    elif status == "corrigido":
+        texto = f"Guardrail: corrigido na {laudo.tentativas}a tentativa (violações: {violacoes})"
+    elif status == "aprovado_com_aviso":
+        # só sobraram violações de qualidade: mostra a forma curta ("texto sem acentos")
+        curtas = []
+        for v in getattr(laudo, "violacoes", ()) or ():
+            curta = getattr(v, "curto", str(v))
+            if curta not in curtas:
+                curtas.append(curta)
+        texto = f"Guardrail: aprovado com aviso ({'; '.join(curtas)})"
+    elif status == "reprovado":
+        texto = ("Guardrail: reprovado: mostrando o texto do sistema especialista "
+                 f"(violações: {violacoes})")
+    else:
+        return ""
+    # sem quebrar nomes com hífen ("Ácaro-rajado") no meio
+    return textwrap.fill(texto, width=LARGURA, subsequent_indent="    ",
+                         break_long_words=False, break_on_hyphens=False)
+
+
+def _titulo_do_laudo(linha):
+    """(título canônico, resto da linha) se a linha começa com um título de bloco; senão None.
+
+    Tolera variações comuns do LLM: maiúsculas, "Por que" sem acento e texto na mesma linha
+    do título ("Por quê: porque...")."""
+    baixa = linha.lower()
+    for titulo in TITULOS_LAUDO:
+        for variante in {titulo.lower(), titulo.lower().replace("quê", "que")}:
+            if baixa.startswith(variante):
+                return titulo, linha[len(variante):].strip()
+    return None
+
+
+def _blocos_do_laudo(texto, recuo_titulo=4, recuo_texto=6):
+    """Texto do laudo por blocos: título com recuo 4; parágrafos e linhas "- " com recuo 6.
+
+    Linhas seguidas de um mesmo parágrafo são juntadas e quebradas de novo em LARGURA, sem
+    recuo pendurado. Linha em branco antes de cada título (exceto o primeiro)."""
+    saida, paragrafo = [], []
+    base = " " * recuo_texto
+
+    def fechar_paragrafo():
+        if paragrafo:
+            saida.append(textwrap.fill(" ".join(paragrafo), width=LARGURA, initial_indent=base,
+                                       subsequent_indent=base, break_long_words=False))
+            paragrafo.clear()
+
+    for bruta in texto.splitlines():
+        linha = bruta.strip()
+        if not linha:
+            fechar_paragrafo()
+            continue
+        titulo = _titulo_do_laudo(linha)
+        if titulo is not None:
+            fechar_paragrafo()
+            if saida:
+                saida.append("")
+            saida.append(" " * recuo_titulo + titulo[0])
+            if titulo[1]:
+                paragrafo.append(titulo[1])
+        elif linha.startswith("- "):
+            fechar_paragrafo()
+            saida.append(textwrap.fill(linha[2:].strip(), width=LARGURA,
+                                       initial_indent=base + "- ",
+                                       subsequent_indent=base + "  ", break_long_words=False))
+        else:
+            paragrafo.append(linha)
+    fechar_paragrafo()
+    return "\n".join(saida)
+
+
+def formatar_aviso_laudo(motivo):
+    """Falha inesperada ao gerar o laudo (só o tipo do erro: a mensagem poderia ter dados)."""
+    return _paragrafo(f"Não foi possível gerar o laudo da IA generativa ({motivo}). O "
+                      "diagnóstico acima continua válido.", recuo=0)

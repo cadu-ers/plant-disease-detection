@@ -6,7 +6,7 @@ Entrada e saída são injetáveis (os testes usam entradas simuladas); as depend
 também (Dependencias). Fluxo de "1) Analisar imagem aleatória":
 
     sorteia (seed gerada aqui) -> mostra SÓ a divisão -> diagnostica -> mostra o diagnóstico
-    -> espera Enter -> compara com a classe real -> grava as figuras -> mostra a comparação,
+    -> (se houver gerar_laudo) mostra o laudo da IA generativa -> espera Enter -> compara com a classe real -> grava as figuras -> mostra a comparação,
     a pasta e a seed -> "Analisar outra? (s/n)"
 
 Regras importantes:
@@ -47,6 +47,9 @@ class Dependencias:
     salvar_figuras: Callable = salvar_figuras
     pasta_base: Optional[Path] = None                        # None: rotina_demo/cli/
     raiz: Path = RAIZ_REPOSITORIO                            # só para mostrar caminhos relativos
+    # (diagnostico, kb) -> Laudo. None: sem IA generativa (padrão, para os testes não usarem
+    # a API). O ponto de entrada diagnostico_cli.py liga o laudo do Gemini.
+    gerar_laudo: Optional[Callable] = None
 
 
 class Sessao:
@@ -132,6 +135,14 @@ def analisar_uma(sessao, entrada, saida):
         return False
     saida("")
     saida(tela)
+
+    if deps.gerar_laudo is not None and diag.status == "ok":
+        saida("")
+        saida(fmt.MSG_GERANDO_LAUDO)
+        try:
+            saida(fmt.formatar_laudo(deps.gerar_laudo(diag, kb)))
+        except Exception as erro:                            # o laudo nunca derruba a análise
+            saida(fmt.formatar_aviso_laudo(type(erro).__name__))
 
     # --- revelação: nada abaixo é mostrado antes do Enter ---
     saida("")

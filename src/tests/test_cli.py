@@ -7,6 +7,7 @@ teste grava em rotina_demo/.
 
 import builtins
 import os
+import re
 import subprocess
 import sys
 from types import SimpleNamespace
@@ -673,5 +674,249 @@ def test_entrada_redirecionada_repete_o_texto_lido():
 def test_o_modulo_menu_usa_so_dependencias_injetaveis():
     campos = set(Dependencias.__dataclass_fields__)
     assert {"criar_sorteador", "carregar_preditor", "obter_kb", "gerar_seed", "diagnosticar",
-            "salvar_figuras", "pasta_base", "raiz"} == campos
+            "salvar_figuras", "pasta_base", "raiz", "gerar_laudo"} == campos
+    assert menu.Dependencias().gerar_laudo is None                     # padrão: sem API
     assert menu.Dependencias().pasta_base is None                      # padrão: rotina_demo/cli
+
+
+# ------------------------------------------------------------- laudo da IA generativa
+def _laudo(texto="Texto do laudo para o agricultor.", fonte="llm", **kw):
+    from ia.generativa.laudo import Laudo
+    return Laudo(texto=texto, fonte=fonte, modelo=kw.pop("modelo", "m-teste"), **kw)
+
+
+def test_sem_gerar_laudo_o_laudo_nao_aparece(projeto, kb):
+    t = Terminal(*FLUXO)
+    assert rodar(t, deps_de_teste(projeto, kb)) == 0
+    assert "LAUDO EM LINGUAGEM SIMPLES" not in t.texto
+
+
+def test_com_gerar_laudo_o_laudo_aparece_antes_do_enter(projeto, kb):
+    recebidos = []
+
+    def gerar(diag, kb_):
+        recebidos.append(diag)
+        return _laudo()
+
+    t = Terminal(*FLUXO)
+    assert rodar(t, deps_de_teste(projeto, kb, gerar_laudo=gerar)) == 0
+    antes = t.antes_do_enter()
+    assert "LAUDO EM LINGUAGEM SIMPLES (IA GENERATIVA)" in antes
+    assert "Texto do laudo para o agricultor." in antes and "m-teste" in antes
+    assert antes.index("[7] Explicação") < antes.index("LAUDO EM LINGUAGEM SIMPLES")
+    assert len(recebidos) == 1 and isinstance(recebidos[0], ResultadoDiagnostico)
+    assert "COMPARAÇÃO COM A CLASSE REAL" in t.depois_do_enter()
+
+
+def test_laudo_indisponivel_mostra_o_motivo_e_segue(projeto, kb):
+    gerar = lambda d, k: _laudo(texto="explicação", fonte="motor", modelo=None,
+                                aviso="variável de ambiente GEMINI_API_KEY não definida")
+    t = Terminal(*FLUXO)
+    assert rodar(t, deps_de_teste(projeto, kb, gerar_laudo=gerar)) == 0
+    assert "IA generativa indisponível" in t.antes_do_enter()
+    assert "GEMINI_API_KEY" in t.antes_do_enter()
+    assert "COMPARAÇÃO COM A CLASSE REAL" in t.depois_do_enter()
+
+
+def test_laudo_que_falha_nao_derruba_a_analise_nem_vaza_a_mensagem(projeto, kb):
+    def gerar(diag, kb_):
+        raise RuntimeError("ISCA_CAMINHO data/Tomato_ISCA/arquivo_isca.jpg")
+
+    t = Terminal(*FLUXO)
+    assert rodar(t, deps_de_teste(projeto, kb, gerar_laudo=gerar)) == 0
+    antes = t.antes_do_enter()
+    assert "Não foi possível gerar o laudo da IA generativa (RuntimeError)" in antes
+    assert "ISCA" not in antes
+    assert "COMPARAÇÃO COM A CLASSE REAL" in t.depois_do_enter()
+
+
+def test_laudo_com_doenca_fora_dos_fatos_mostra_alerta():
+    tela = fmt.formatar_laudo(_laudo(doencas_fora_dos_fatos=("Ácaro-rajado (Two-spotted spider mite)",)))
+    texto = " ".join(tela.split())
+    assert "ATENÇÃO: o texto abaixo cita doença(s) que NÃO estão no diagnóstico" in texto
+    assert "Ácaro-rajado" in texto
+
+
+LAUDO_V2 = """O que o sistema encontrou:
+O sistema não tem certeza. A hipótese mais forte é o mosaico do tomateiro, mas faltam
+sinais para confirmar.
+
+Por quê:
+A análise da foto aponta mosaico, mas os sinais medidos na folha ainda não confirmam.
+
+Perguntas para você:
+- A folha tem um mosqueado de verde claro e escuro?
+- As folhas estão deformadas, estreitas ou menores que o normal, principalmente as mais novas da planta?
+
+O que fazer:
+Se o diagnóstico for confirmado por um técnico, remova as plantas infectadas. Procure um agrônomo."""
+
+
+def test_formatar_laudo_por_blocos_com_recuo_4_e_6():
+    tela = fmt.formatar_laudo(_laudo(texto=LAUDO_V2))
+    linhas = tela.splitlines()
+    for titulo in ("O que o sistema encontrou:", "Por quê:", "Perguntas para você:",
+                   "O que fazer:"):
+        assert "    " + titulo in linhas, titulo                  # título sozinho, recuo 4
+    corpo = linhas[linhas.index("    O que o sistema encontrou:"):]
+    assert all(len(l) <= fmt.LARGURA for l in corpo)
+    # só três recuos no corpo: 4 (título), 6 (parágrafo / "- ") e 8 (continuação de pergunta)
+    recuos = {len(l) - len(l.lstrip()) for l in corpo if l}
+    assert recuos == {4, 6, 8}
+    # parágrafo de várias linhas do LLM vira um só, quebrado de novo, todo com recuo 6
+    i = linhas.index("    O que o sistema encontrou:")
+    assert linhas[i + 1].startswith("      O sistema não tem certeza.")
+    assert all(l.startswith("      ") and l[6] != " " for l in linhas[i + 1:linhas.index("    Por quê:") - 1])
+    assert "      - A folha tem um mosqueado de verde claro e escuro?" in linhas
+    # pergunta longa: continuação alinhada ao texto da pergunta, não ao título
+    j = next(k for k, l in enumerate(linhas) if l.startswith("      - As folhas"))
+    assert linhas[j + 1].startswith("        ") and linhas[j + 1][8] != " "
+    # uma linha em branco antes de cada título (exceto o primeiro)
+    assert linhas[linhas.index("    Por quê:") - 1] == ""
+
+
+def test_formatar_laudo_aceita_texto_na_linha_do_titulo_e_por_que_sem_acento():
+    tela = fmt.formatar_laudo(_laudo(texto="Por que: a foto aponta mosaico.\nO QUE FAZER:\nProcure um agrônomo."))
+    linhas = tela.splitlines()
+    assert "    Por quê:" in linhas and "      a foto aponta mosaico." in linhas
+    assert "    O que fazer:" in linhas and "      Procure um agrônomo." in linhas
+
+
+def test_linha_do_guardrail_aprovado_e_corrigido():
+    aprovado = fmt.formatar_laudo(_laudo(texto=LAUDO_V2, status_guardrail="aprovado",
+                                         tentativas=1))
+    assert "Guardrail: aprovado na 1a tentativa" in aprovado.splitlines()
+    corrigido = fmt.formatar_laudo(_laudo(
+        texto=LAUDO_V2, status_guardrail="corrigido", tentativas=2,
+        violacoes=("cita doença fora do diagnóstico: Ácaro-rajado (Two-spotted spider mite)",
+                   'usa "%" (força da evidência não é porcentagem)')))
+    texto = " ".join(corrigido.split())
+    assert ("Guardrail: corrigido na 2a tentativa (violações: cita doença fora do diagnóstico: "
+            "Ácaro-rajado (Two-spotted spider mite); usa \"%\"") in texto
+    assert "Ácaro-rajado" in corrigido                      # nome com hífen não é quebrado
+    assert "    O que o sistema encontrou:" in corrigido.splitlines()   # o laudo do LLM aparece
+
+
+def test_guardrail_reprovado_mostra_o_texto_do_sistema_especialista():
+    tela = fmt.formatar_laudo(_laudo(texto="Explicação do motor.", fonte="motor", modelo=None,
+                                     aviso="o guardrail reprovou", status_guardrail="reprovado",
+                                     tentativas=2, violacoes=("indica dose ou produto (\"dose\")",)))
+    texto = " ".join(tela.split())
+    assert ("Guardrail: reprovado: mostrando o texto do sistema especialista (violações: "
+            "indica dose ou produto (\"dose\"))") in texto
+    assert "    Explicação do motor." in tela.splitlines()
+    assert "Texto gerado pelo Gemini" not in tela and "indisponível" not in tela
+
+
+def test_linha_do_guardrail_aprovado_com_aviso():
+    from ia.generativa.guardrail import Violacao
+    aviso = Violacao('texto sem acentos ("nao", "diagnostico"); escreva em português com '
+                     "acentos", nivel="qualidade", curto="texto sem acentos")
+    tela = fmt.formatar_laudo(_laudo(texto=LAUDO_V2, status_guardrail="aprovado_com_aviso",
+                                     tentativas=2, violacoes=(aviso,)))
+    linhas = tela.splitlines()
+    assert "Guardrail: aprovado com aviso (texto sem acentos)" in linhas
+    assert "Texto gerado pelo Gemini" in tela                   # o texto do LLM é mostrado
+    assert "    O que o sistema encontrou:" in linhas
+    tela.encode("cp850")
+
+
+def test_sem_guardrail_nao_ha_linha_de_guardrail():
+    assert "Guardrail" not in fmt.formatar_laudo(_laudo(texto=LAUDO_V2))
+    indisponivel = fmt.formatar_laudo(_laudo(texto="x", fonte="motor", modelo=None,
+                                             aviso="sem chave"))
+    assert "Guardrail" not in indisponivel and "IA generativa indisponível" in indisponivel
+
+
+def test_texto_da_cli_do_guardrail_cabe_no_console_do_windows():
+    tela = fmt.formatar_laudo(_laudo(
+        texto=LAUDO_V2, status_guardrail="corrigido", tentativas=2,
+        violacoes=('"o_que_fazer" manda destruir, arrancar, eliminar, remover, retirar ou '
+                   "queimar plantas sem a condição de confirmação (o caso não é conclusivo)",
+                   'chama a força das regras de "fraca", "baixa" ou "pequena", mas nenhuma '
+                   "regra disparou")))
+    tela.encode("cp850")
+    tela.encode("cp1252")
+    assert all(len(l) <= fmt.LARGURA for l in tela.splitlines())
+
+
+@pytest.mark.parametrize("argv, esperado", [
+    ([], (False, None, False)),
+    (["--sem-llm"], (True, None, False)),
+    (["--seed", "594525008"], (False, 594525008, False)),
+    (["--seed=42", "--sem-llm"], (True, 42, False)),
+    (["--sem-llm", "--seed", "0"], (True, 0, False)),
+    (["--sem-cache"], (False, None, True)),
+    (["--seed", "7", "--sem-cache"], (False, 7, True)),
+])
+def test_ler_opcoes_aceita_sem_llm_sem_cache_e_seed(argv, esperado):
+    import diagnostico_cli
+    opcoes = diagnostico_cli.ler_opcoes(argv)
+    assert opcoes == esperado
+    assert (opcoes.sem_llm, opcoes.seed, opcoes.sem_cache) == esperado
+
+
+@pytest.mark.parametrize("argv, usar_cache", [([], True), (["--sem-cache"], False)])
+def test_sem_cache_repassa_usar_cache_false_ao_cliente_do_laudo(monkeypatch, argv, usar_cache):
+    import diagnostico_cli
+    from ia.generativa import laudo as modulo_laudo
+    pedidos = []
+    monkeypatch.setattr(modulo_laudo, "criar_gerador_de_laudo",
+                        lambda **kw: pedidos.append(kw) or "gerador")
+    capturadas = []
+    monkeypatch.setattr(menu, "executar", lambda entrada, saida, deps: capturadas.append(deps) or 0)
+    assert diagnostico_cli.principal(argv) == 0
+    assert pedidos == [{"usar_cache": usar_cache}] and capturadas[0].gerar_laudo == "gerador"
+
+
+def test_sem_cache_com_sem_llm_nao_cria_o_laudo(monkeypatch):
+    import diagnostico_cli
+    from ia.generativa import laudo as modulo_laudo
+    monkeypatch.setattr(modulo_laudo, "criar_gerador_de_laudo",
+                        lambda **kw: pytest.fail("não devia criar o gerador de laudo"))
+    capturadas = []
+    monkeypatch.setattr(menu, "executar", lambda entrada, saida, deps: capturadas.append(deps) or 0)
+    assert diagnostico_cli.principal(["--sem-llm", "--sem-cache"]) == 0
+    assert capturadas[0].gerar_laudo is None
+
+
+@pytest.mark.parametrize("argv, trecho", [
+    (["--xyz"], "Opção desconhecida: --xyz."),
+    (["--seed"], "Falta o valor de --seed"),
+    (["--seed", "abc"], "Seed inválida: 'abc'"),
+    (["--seed=1.5"], "Seed inválida: '1.5'"),
+    (["--seed", "-3"], "Seed inválida: -3"),
+])
+def test_ler_opcoes_recusa_opcao_desconhecida_e_seed_invalida(argv, trecho):
+    import diagnostico_cli
+    with pytest.raises(ValueError, match=re.escape(trecho)):
+        diagnostico_cli.ler_opcoes(argv)
+
+
+def test_seed_da_linha_de_comando_vai_para_as_dependencias(monkeypatch):
+    import diagnostico_cli
+    recebidas = []
+    monkeypatch.setattr(menu, "executar", lambda entrada, saida, deps: recebidas.append(deps) or 0)
+    assert diagnostico_cli.principal(["--seed", "594525008", "--sem-llm"]) == 0
+    assert diagnostico_cli.principal(["--sem-llm"]) == 0
+    com_seed, sem_seed = recebidas
+    assert com_seed.gerar_seed() == 594525008 and com_seed.gerar_seed() == 594525008
+    assert com_seed.gerar_laudo is None                               # --sem-llm continua valendo
+    assert sem_seed.gerar_seed is menu._gerar_seed                    # sem --seed: sorteio normal
+
+
+def test_com_seed_fixa_o_sorteio_usa_essa_seed_e_ela_so_aparece_depois_do_enter(projeto, kb):
+    t = Terminal(*FLUXO)
+    rodar(t, deps_de_teste(projeto, kb, seed=594525008))
+    assert "594525008" not in t.antes_do_enter()
+    assert "Seed: 594525008 (identifica este sorteio)" in t.depois_do_enter()
+
+
+def test_ponto_de_entrada_recusa_opcao_desconhecida():
+    codigo = ("import sys; sys.path.insert(0, sys.argv[1]); import diagnostico_cli; "
+              "sys.exit(diagnostico_cli.principal(['--xyz']))")
+    resultado = rodar_python(codigo)
+    assert resultado.returncode == 2
+    assert "Opção desconhecida: --xyz." in resultado.stderr
+    assert "--sem-llm" in resultado.stderr and "--seed N" in resultado.stderr
+    assert "--sem-cache" in resultado.stderr
