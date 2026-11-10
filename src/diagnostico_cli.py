@@ -21,6 +21,12 @@ laudo passa pelo guardrail e vira uma linha em rotina_demo/guardrail_log.jsonl. 
 --sem-cache, uma resposta já recebida é reaproveitada do cache (rotina_demo/llm_cache/): o
 log marca "do_cache" e essas linhas não devem entrar nas contagens da avaliação.
 
+Conversa: depois da revelação, se o diagnóstico não for conclusivo, a CLI pede para você
+olhar a folha (original.png na pasta mostrada) e responder em texto livre. O Gemini traduz
+a resposta em sintomas, você confirma, e o sistema especialista recalcula (ANTES x
+DEPOIS). Registro em rotina_demo/conversa_log.jsonl, sem o texto digitado. Desligada com
+--sem-llm.
+
 Menu: 1) Analisar imagem aleatória   0) Sair
 Gera (em rotina_demo/cli/AAAAMMDD_HHMMSS_<hex>/, ignorada pelo Git, sem apagar nada):
     original.png, mascara.png, segmentada.png e painel.png da imagem analisada
@@ -109,6 +115,7 @@ def principal(argv=()):
         return 2
     try:
         from cli.menu import Dependencias, executar
+        from ia.generativa.conversa import criar_conversa
         from ia.generativa.laudo import criar_gerador_de_laudo
     except ImportError as erro:
         print(f"Não foi possível importar '{erro.name or erro}'. Use o Python do projeto "
@@ -116,9 +123,11 @@ def principal(argv=()):
               file=sys.stderr)
         return 1
     extras = {} if opcoes.seed is None else {"gerar_seed": lambda: opcoes.seed}
-    gerar_laudo = (None if opcoes.sem_llm
-                   else criar_gerador_de_laudo(usar_cache=not opcoes.sem_cache))
-    deps = Dependencias(gerar_laudo=gerar_laudo, **extras)
+    gerar_laudo = conversar = None
+    if not opcoes.sem_llm:                       # laudo e conversa: ligados juntos
+        gerar_laudo = criar_gerador_de_laudo(usar_cache=not opcoes.sem_cache)
+        conversar = criar_conversa(usar_cache=not opcoes.sem_cache)
+    deps = Dependencias(gerar_laudo=gerar_laudo, conversar=conversar, **extras)
     return executar(entrada=_entrada, saida=print, deps=deps)
 
 

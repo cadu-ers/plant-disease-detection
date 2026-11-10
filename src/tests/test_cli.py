@@ -674,8 +674,9 @@ def test_entrada_redirecionada_repete_o_texto_lido():
 def test_o_modulo_menu_usa_so_dependencias_injetaveis():
     campos = set(Dependencias.__dataclass_fields__)
     assert {"criar_sorteador", "carregar_preditor", "obter_kb", "gerar_seed", "diagnosticar",
-            "salvar_figuras", "pasta_base", "raiz", "gerar_laudo"} == campos
+            "salvar_figuras", "pasta_base", "raiz", "gerar_laudo", "conversar"} == campos
     assert menu.Dependencias().gerar_laudo is None                     # padrão: sem API
+    assert menu.Dependencias().conversar is None                       # padrão: sem API
     assert menu.Dependencias().pasta_base is None                      # padrão: rotina_demo/cli
 
 
@@ -861,12 +862,18 @@ def test_sem_cache_repassa_usar_cache_false_ao_cliente_do_laudo(monkeypatch, arg
     import diagnostico_cli
     from ia.generativa import laudo as modulo_laudo
     pedidos = []
+    from ia.generativa import conversa as modulo_conversa
     monkeypatch.setattr(modulo_laudo, "criar_gerador_de_laudo",
                         lambda **kw: pedidos.append(kw) or "gerador")
+    conversas = []
+    monkeypatch.setattr(modulo_conversa, "criar_conversa",
+                        lambda **kw: conversas.append(kw) or "conversa")
     capturadas = []
     monkeypatch.setattr(menu, "executar", lambda entrada, saida, deps: capturadas.append(deps) or 0)
     assert diagnostico_cli.principal(argv) == 0
     assert pedidos == [{"usar_cache": usar_cache}] and capturadas[0].gerar_laudo == "gerador"
+    # a conversa é ligada junto com o laudo, com o mesmo --sem-cache
+    assert conversas == [{"usar_cache": usar_cache}] and capturadas[0].conversar == "conversa"
 
 
 def test_sem_cache_com_sem_llm_nao_cria_o_laudo(monkeypatch):
@@ -876,8 +883,11 @@ def test_sem_cache_com_sem_llm_nao_cria_o_laudo(monkeypatch):
                         lambda **kw: pytest.fail("não devia criar o gerador de laudo"))
     capturadas = []
     monkeypatch.setattr(menu, "executar", lambda entrada, saida, deps: capturadas.append(deps) or 0)
+    from ia.generativa import conversa as modulo_conversa
+    monkeypatch.setattr(modulo_conversa, "criar_conversa",
+                        lambda **kw: pytest.fail("não devia criar a conversa"))
     assert diagnostico_cli.principal(["--sem-llm", "--sem-cache"]) == 0
-    assert capturadas[0].gerar_laudo is None
+    assert capturadas[0].gerar_laudo is None and capturadas[0].conversar is None
 
 
 @pytest.mark.parametrize("argv, trecho", [
@@ -920,3 +930,223 @@ def test_ponto_de_entrada_recusa_opcao_desconhecida():
     assert "Opção desconhecida: --xyz." in resultado.stderr
     assert "--sem-llm" in resultado.stderr and "--seed N" in resultado.stderr
     assert "--sem-cache" in resultado.stderr
+
+
+# ---------------------------------------------------------- conversa (depois da revelação)
+CLASSE_MOSAICO = "Tomato__Tomato_mosaic_virus"
+RESPOSTA = "Sim, tem umas manchas verde claro e escuro, tipo mosaico"
+
+
+def criar_projeto_mosaico(raiz):
+    """Folha toda verde (nenhuma regra de imagem aponta doença), classe real mosaico."""
+    img = np.full((224, 224, 3), (150, 150, 150), np.uint8)
+    cv2.ellipse(img, (112, 112), (85, 70), 0, 0, 360, (40, 160, 60), -1)
+    rel = f"data/{CLASSE_MOSAICO}/{ARQUIVO}"
+    (raiz / "data" / CLASSE_MOSAICO).mkdir(parents=True)
+    assert cv2.imwrite(str(raiz / rel), img)
+    (raiz / "data_split").mkdir()
+    pd.DataFrame([{"class": CLASSE_MOSAICO, "filename": ARQUIVO, "split": "test",
+                   "processed_path": "data_processed/x.jpg", "original_path": rel}]
+                 ).to_csv(raiz / "data_split" / "split_manifest.csv", index=False)
+    return raiz
+
+
+@pytest.fixture
+def projeto_mosaico(tmp_path):
+    return criar_projeto_mosaico(tmp_path)
+
+
+class PreditorMosaico:
+    def __init__(self):
+        self.class_names = tuple(CLASSES)
+        self.vetor = np.zeros(len(CLASSES), np.float32)
+        self.vetor[CLASSES.index(CLASSE_MOSAICO)] = 0.99
+        self.vetor[CLASSES.index("Tomato__Tomato_YellowLeaf__Curl_Virus")] = 0.01
+        self.chamadas = 0
+
+    def __call__(self, segmentada_bgr, extensao=".jpg"):
+        self.chamadas += 1
+        return self.vetor
+
+
+class TransporteConversa:
+    """Transporte falso do LLM da conversa: entende "mosqueado" na resposta."""
+
+    def __init__(self, dados=None):
+        self.dados = dados if dados is not None else {
+            "mosaico_claro_escuro": {"valor": 1, "trecho": "manchas verde claro e escuro"},
+            "folha_deformada": {"valor": None, "trecho": None}}
+        self.chamadas = []
+
+    def __call__(self, modelo, prompt, imagens, opcoes):
+        import json
+        self.chamadas.append(prompt)
+        return json.dumps(self.dados, ensure_ascii=False)
+
+
+def conversa_falsa(transporte=None):
+    from ia.generativa.cliente import ClienteLLM
+    from ia.generativa.conversa import criar_conversa
+    transporte = transporte or TransporteConversa()
+    cliente = ClienteLLM(modelo="m-teste", modelo_reserva=None, transporte=transporte,
+                         usar_cache=False)
+    return criar_conversa(cliente, log=None), transporte
+
+
+def deps_mosaico(raiz, kb, **troca):
+    troca.setdefault("conversar", conversa_falsa()[0])
+    return deps_de_teste(raiz, kb, preditor=PreditorMosaico(), **troca)
+
+
+def depois_da_revelacao(t):
+    return " ".join("\n".join(t.linhas[t.marcas[0]:]).split())
+
+
+def test_fluxo_completo_da_conversa_inconclusiva_vira_conclusiva(projeto_mosaico, kb):
+    transporte = TransporteConversa()
+    conversar, _ = conversa_falsa(transporte)
+    t = Terminal("1", "", RESPOSTA, "s", "n", "0")
+    assert rodar(t, deps_mosaico(projeto_mosaico, kb, conversar=conversar)) == 0
+    depois = depois_da_revelacao(t)
+    # a conversa vem DEPOIS da comparação com a classe real e antes de "Analisar outra?"
+    assert depois.index("COMPARAÇÃO COM A CLASSE REAL") < depois.index("CONVERSA")
+    assert depois.index("ANTES x DEPOIS") < depois.index(fmt.PROMPT_OUTRA.strip())
+    assert "Olhe a folha em figuras/" in depois
+    assert "/original.png e responda em texto livre" in depois
+    assert "1. A folha tem um mosqueado (mosaico) de verde claro e escuro?" in depois
+    assert ('Entendi: - mosqueado de áreas verde-claras e verde-escuras: sim '
+            '("manchas verde claro e escuro")') in depois
+    assert "Antes: Vírus do mosaico do tomateiro (ToMV) (CF = 0.49) - NÃO CONCLUSIVA" in depois
+    assert "Depois: Vírus do mosaico do tomateiro (ToMV) (CF = 0.90) - CONCLUSIVA" in depois
+    assert "Regras que passaram a disparar: R30" in depois
+    assert len(transporte.chamadas) == 1 and RESPOSTA in transporte.chamadas[0]
+    assert "CONVERSA" not in t.antes_do_enter()                 # nada da conversa antes do Enter
+
+
+def test_conversa_gera_o_laudo_novo_do_diagnostico_recalculado(projeto_mosaico, kb):
+    recebidos = []
+
+    def gerar(diag, kb_):
+        recebidos.append(diag)
+        return _laudo(texto=f"Laudo {len(recebidos)}.")
+
+    t = Terminal("1", "", RESPOSTA, "s", "n", "0")
+    assert rodar(t, deps_mosaico(projeto_mosaico, kb, gerar_laudo=gerar)) == 0
+    assert len(recebidos) == 2                                  # o de antes e o recalculado
+    assert not recebidos[0].conclusao.conclusivo and recebidos[1].conclusao.conclusivo
+    depois = depois_da_revelacao(t)
+    assert depois.index("ANTES x DEPOIS") < depois.index("Laudo 2.")
+
+
+def test_n_na_confirmacao_nao_recalcula(projeto_mosaico, kb):
+    preditor = PreditorMosaico()
+    t = Terminal("1", "", RESPOSTA, "n", "n", "0")
+    deps = deps_de_teste(projeto_mosaico, kb, preditor=preditor, conversar=conversa_falsa()[0])
+    assert rodar(t, deps) == 0
+    depois = depois_da_revelacao(t)
+    assert "Entendi:" in depois and fmt.MSG_NAO_RECALCULADO in depois
+    assert "ANTES x DEPOIS" not in depois and preditor.chamadas == 1
+
+
+def test_confirmacao_invalida_pergunta_de_novo(projeto_mosaico, kb):
+    t = Terminal("1", "", RESPOSTA, "talvez", "s", "n", "0")
+    assert rodar(t, deps_mosaico(projeto_mosaico, kb)) == 0
+    assert fmt.MSG_RESPOSTA_INVALIDA in t.texto and "ANTES x DEPOIS" in t.texto
+
+
+def test_enter_vazio_pula_a_conversa_sem_chamar_o_llm(projeto_mosaico, kb):
+    conversar, transporte = conversa_falsa()
+    t = Terminal("1", "", "   ", "n", "0")
+    assert rodar(t, deps_mosaico(projeto_mosaico, kb, conversar=conversar)) == 0
+    assert fmt.MSG_CONVERSA_PULADA in t.texto and transporte.chamadas == []
+    assert "Entendi:" not in t.texto and "ANTES x DEPOIS" not in t.texto
+
+
+def test_conversa_desligada_nao_pergunta_nada(projeto_mosaico, kb):
+    t = Terminal("1", "", "n", "0")
+    assert rodar(t, deps_de_teste(projeto_mosaico, kb, preditor=PreditorMosaico())) == 0
+    assert "CONVERSA" not in t.texto and fmt.PROMPT_RESPOSTA not in t.linhas
+
+
+def test_diagnostico_conclusivo_nao_pergunta(projeto_mosaico, kb):
+    def conclusivo(*args, **kw):                   # o usuário já teria dito "tem mosqueado"
+        return diagnosticar_amostra(*args, **{**kw, "sintomas_usuario": {"mosaico_claro_escuro": 1}})
+
+    conversar, transporte = conversa_falsa()
+    t = Terminal("1", "", "n", "0")
+    assert rodar(t, deps_mosaico(projeto_mosaico, kb, conversar=conversar,
+                                 diagnosticar=conclusivo)) == 0
+    assert "NÃO CONCLUSIVA" not in t.antes_do_enter()
+    assert "CONVERSA" not in t.texto and transporte.chamadas == []
+
+
+def test_sintoma_inventado_aparece_como_descartado(projeto_mosaico, kb):
+    conversar, _ = conversa_falsa(TransporteConversa({
+        "mosaico_claro_escuro": {"valor": 1, "trecho": "tipo mosaico"},
+        "folha_deformada": {"valor": 1, "trecho": "as folhas estão deformadas"},
+        "Tomato_mosaic_virus": {"valor": 1, "trecho": "mosaico"}}))
+    t = Terminal("1", "", RESPOSTA, "s", "n", "0")
+    assert rodar(t, deps_mosaico(projeto_mosaico, kb, conversar=conversar)) == 0
+    depois = depois_da_revelacao(t)
+    assert ("Não usei: - folhas deformadas ou reduzidas: não encontrei isso na sua resposta"
+            in depois)
+    assert "um sintoma não perguntado: o sintoma não foi perguntado" in depois
+    conversa = depois[depois.index("CONVERSA"):]                  # a revelação mostra a classe
+    assert "Tomato_mosaic_virus" not in conversa                  # id inventado não aparece
+    assert "Depois: Vírus do mosaico do tomateiro (ToMV) (CF = 0.90)" in depois
+
+
+def test_nenhum_sintoma_entendido_nao_pede_confirmacao(projeto_mosaico, kb):
+    conversar, _ = conversa_falsa(TransporteConversa({
+        "mosaico_claro_escuro": {"valor": None, "trecho": None},
+        "folha_deformada": {"valor": None, "trecho": None}}))
+    t = Terminal("1", "", "não sei dizer", "n", "0")
+    assert rodar(t, deps_mosaico(projeto_mosaico, kb, conversar=conversar)) == 0
+    assert fmt.MSG_NADA_A_RECALCULAR in t.texto and fmt.PROMPT_CONFIRMA not in t.linhas
+
+
+def test_llm_indisponivel_na_conversa_avisa_e_segue(projeto_mosaico, kb):
+    from ia.generativa.conversa import Interpretacao
+
+    def conversar(texto, sintomas):
+        return Interpretacao(aviso="sem chave")
+
+    t = Terminal("1", "", RESPOSTA, "n", "0")
+    assert rodar(t, deps_mosaico(projeto_mosaico, kb, conversar=conversar)) == 0
+    assert "IA generativa indisponível (sem chave). Nada foi recalculado." in t.texto
+    assert fmt.PROMPT_CONFIRMA not in t.linhas and fmt.PROMPT_OUTRA in t.linhas
+
+
+def test_erro_na_conversa_nao_derruba_a_analise(projeto_mosaico, kb):
+    def quebra(texto, sintomas):
+        raise RuntimeError("data/Tomato_ISCA/arquivo.JPG")
+
+    t = Terminal("1", "", RESPOSTA, "n", "0")
+    assert rodar(t, deps_mosaico(projeto_mosaico, kb, conversar=quebra)) == 0
+    assert "Não foi possível concluir a conversa (RuntimeError)" in t.texto
+    assert "ISCA" not in t.texto[t.texto.index("CONVERSA"):]      # só o tipo do erro
+    assert fmt.PROMPT_OUTRA in t.linhas
+
+
+@pytest.mark.parametrize("fim", [[], [KeyboardInterrupt]])
+def test_eof_ou_ctrl_c_na_conversa_encerram_sem_traceback(projeto_mosaico, kb, fim):
+    t = Terminal("1", "", *fim)
+    assert rodar(t, deps_mosaico(projeto_mosaico, kb)) == 0
+    assert t.linhas[-1] == fmt.MSG_ENCERRANDO
+    assert "Não foi possível concluir a conversa" not in t.texto
+
+
+@pytest.mark.parametrize("fim", [[RESPOSTA], [RESPOSTA, KeyboardInterrupt]])
+def test_eof_ou_ctrl_c_na_confirmacao_encerram(projeto_mosaico, kb, fim):
+    t = Terminal("1", "", *fim)
+    assert rodar(t, deps_mosaico(projeto_mosaico, kb)) == 0
+    assert t.linhas[-1] == fmt.MSG_ENCERRANDO and "ANTES x DEPOIS" not in t.texto
+
+
+def test_textos_da_conversa_cabem_no_console_do_windows(projeto_mosaico, kb):
+    t = Terminal("1", "", RESPOSTA, "s", "n", "0")
+    rodar(t, deps_mosaico(projeto_mosaico, kb))
+    depois = "\n".join(t.linhas[t.marcas[0]:])
+    depois.encode("cp850")
+    depois.encode("cp1252")
+    assert all(len(l) <= fmt.LARGURA for l in depois.splitlines() if "figuras" not in l)

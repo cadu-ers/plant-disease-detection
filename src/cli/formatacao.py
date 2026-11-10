@@ -470,6 +470,99 @@ def _blocos_do_laudo(texto, recuo_titulo=4, recuo_texto=6):
     return "\n".join(saida)
 
 
+# --------------------------------------------------------------------------------- conversa
+# Só DEPOIS da revelação: o usuário já pode abrir a figura salva e olhar a folha.
+PROMPT_RESPOSTA = "Sua resposta: "
+PROMPT_CONFIRMA = "Confirma? (s/n): "
+MSG_INTERPRETANDO = "Interpretando a sua resposta (IA generativa)..."
+MSG_CONVERSA_PULADA = "Conversa pulada: o diagnóstico continua o mesmo."
+MSG_NADA_A_RECALCULAR = ("Nenhum sintoma foi entendido com segurança na sua resposta: o "
+                         "diagnóstico continua o mesmo.")
+MSG_NAO_RECALCULADO = "Não confirmado: o diagnóstico continua o mesmo."
+MSG_RECALCULANDO = "Recalculando o diagnóstico com as suas respostas (sistema especialista)..."
+
+
+def formatar_perguntas_conversa(sintomas, pasta=None, raiz=None):
+    """Convite + perguntas numeradas. `pasta`: onde as figuras foram salvas (ou None)."""
+    if pasta is not None:
+        onde = f"Olhe a folha em {_caminho_curto(Path(pasta) / 'original.png', raiz)}"
+    else:
+        onde = "Olhe a folha (as figuras não foram salvas nesta análise)"
+    linhas = [_titulo("CONVERSA"),
+              _paragrafo(f"{onde} e responda em texto livre às perguntas abaixo (Enter vazio "
+                         "para pular):", recuo=0)]
+    for i, s in enumerate(sintomas, start=1):
+        linhas.append(textwrap.fill(f"{i}. {s.pergunta}", width=LARGURA, initial_indent="  ",
+                                    subsequent_indent="     ", break_long_words=False))
+    return "\n".join(linhas)
+
+
+def _grau_em_palavras(valor):
+    if valor >= 1.0:
+        return "sim"
+    if valor <= 0.0:
+        return "não"
+    return f"parcial ({valor:.1f})".replace(".", ",")
+
+
+def formatar_interpretacao(interp, kb):
+    """"Entendi:" com os sintomas aceitos (descrição + sim/não/parcial + trecho) e os
+    descartados com o motivo. Os ids desconhecidos (inventados pelo LLM) não aparecem."""
+    if interp.aviso:
+        return _paragrafo(f"IA generativa indisponível ({interp.aviso}). Nada foi "
+                          "recalculado.", recuo=0)
+    linhas = ["Entendi:"]
+    for sid, valor in interp.sintomas.items():
+        descricao = kb.sintomas[sid].descricao if sid in kb.sintomas else sid
+        trecho = interp.trechos.get(sid, "")
+        linhas.append(_item(f'{descricao}: {_grau_em_palavras(valor)} ("{trecho}")'))
+    if not interp.sintomas:
+        linhas.append(_item("nenhum sintoma."))
+    descartados = [(sid, motivo) for sid, motivo in interp.descartados]
+    if descartados:
+        linhas.append("Não usei:")
+        for sid, motivo in descartados:
+            nome = kb.sintomas[sid].descricao if sid in kb.sintomas else "um sintoma não perguntado"
+            linhas.append(_item(f"{nome}: {motivo}"))
+    return "\n".join(linhas)
+
+
+def _situacao(conclusao):
+    if conclusao is None or conclusao.hipotese_id is None:
+        return "nenhuma hipótese", None, "NÃO CONCLUSIVA"
+    return conclusao.nome, conclusao.cf, "CONCLUSIVA" if conclusao.conclusivo else "NÃO CONCLUSIVA"
+
+
+def formatar_antes_depois(antes, depois, kb):
+    """Hipótese, CF e situação antes e depois das respostas, e as regras que passaram a
+    disparar (quem recalculou foi o sistema especialista)."""
+    linhas = [_titulo("ANTES x DEPOIS")]
+    for rotulo, diag in (("Antes", antes), ("Depois", depois)):
+        nome, cf, situacao = _situacao(diag.conclusao)
+        cf_txt = "" if cf is None else f" (CF = {cf:.2f})"
+        linhas.append(textwrap.fill(f"{rotulo}: {nome}{cf_txt} - {situacao}", width=LARGURA,
+                                    subsequent_indent="        ", break_long_words=False,
+                                    break_on_hyphens=False))
+    ja = {r.regra_id for r in antes.regras_disparadas}
+    novas = [r for r in depois.regras_disparadas if r.regra_id not in ja]
+    linhas.append("Regras que passaram a disparar:")
+    if not novas:
+        linhas.append("    Nenhuma.")
+    for r in novas:
+        nomes = ", ".join(_nome(kb, h) for h in r.hipoteses)
+        linhas.append(textwrap.fill(f"{r.regra_id} (CF da regra {r.cf:+.2f}) -> {nomes}",
+                                    width=LARGURA, initial_indent="    ",
+                                    subsequent_indent="        ", break_long_words=False))
+        linhas.append(_paragrafo(r.porque, recuo=8))
+    return "\n".join(linhas)
+
+
+def formatar_aviso_conversa(motivo):
+    """Falha inesperada na conversa (só o tipo do erro)."""
+    return _paragrafo(f"Não foi possível concluir a conversa ({motivo}). O diagnóstico acima "
+                      "continua válido.", recuo=0)
+
+
 def formatar_aviso_laudo(motivo):
     """Falha inesperada ao gerar o laudo (só o tipo do erro: a mensagem poderia ter dados)."""
     return _paragrafo(f"Não foi possível gerar o laudo da IA generativa ({motivo}). O "
