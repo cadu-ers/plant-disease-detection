@@ -155,3 +155,6 @@ LLM_CACHE_DIR = os.path.join(DEMO_DIR, "llm_cache")
 # Registro do guardrail do laudo (não versionado): uma linha JSON por laudo, com status
 # (aprovado / corrigido / reprovado), tentativas e violações. Base da visão crítica.
 GUARDRAIL_LOG = os.path.join(DEMO_DIR, "guardrail_log.jsonl")
+# Registro da conversa (não versionado): uma linha JSON por resposta interpretada, com os
+# sintomas aceitos e os descartados pelo guardrail da conversa. Nunca o texto do usuário.
+CONVERSA_LOG = os.path.join(DEMO_DIR, "conversa_log.jsonl")

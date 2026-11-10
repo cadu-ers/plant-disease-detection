@@ -135,6 +135,49 @@ Sua resposta anterior violou:
 Corrija esses pontos e responda de novo, no mesmo formato JSON, seguindo todas as regras.
 """
 
+# --------------------------------------------------------------------------- conversa
+# Converte a resposta LIVRE do usuário em graus de sintomas (ia/generativa/conversa.py).
+# O LLM recebe só os sintomas perguntados (id, descrição, pergunta) e a resposta: nunca a
+# hipótese, a rede neural nem nome de doença, para não induzir a interpretação. Quem
+# recalcula o diagnóstico com esses graus é o sistema especialista.
+VERSAO_PROMPT_CONVERSA = 1
+
+TAREFA_CONVERSA = """\
+Tarefa: o agricultor olhou a folha e respondeu, em texto livre, a algumas perguntas sobre \
+sintomas. Converta a resposta dele em um grau para CADA sintoma da lista. Você não \
+diagnostica nada: só registra o que o agricultor disse.
+
+Regras:
+1. Use SOMENTE o que está escrito na resposta do agricultor. Não deduza um sintoma a \
+partir de outro e não complete com o que "costuma" acontecer.
+2. Escala do "valor":
+   - 1 = sim, o sintoma está claramente presente;
+   - 0 = não, o agricultor disse que o sintoma NÃO aparece;
+   - valores intermediários (por exemplo 0.5) só se ele disser algo como "um pouco", \
+"talvez", "em algumas folhas", "parece que sim";
+   - null = ele não falou desse sintoma, disse que não sabe ou ficou ambíguo. Na dúvida, null.
+3. "trecho": copie LITERALMENTE o pedaço da resposta do agricultor que justifica o valor \
+(as mesmas palavras, sem resumir nem corrigir). Se o valor for null, o trecho também é null.
+4. Responda SOMENTE com o objeto JSON pedido, com um campo para cada id da lista, e nada \
+mais. Não invente ids.
+"""
+
+SISTEMA_CONVERSA = SISTEMA_BASE + "\n" + TAREFA_CONVERSA
+
+MODELO_PROMPT_CONVERSA = """\
+Sintomas perguntados (JSON):
+
+{sintomas_json}
+
+Resposta do agricultor (entre as linhas de traços):
+-----
+{resposta}
+-----
+
+Converta a resposta em graus de sintomas seguindo as regras.
+"""
+
+
 # --------------------------------------------------------------------------- histórico
 # Tarefa do laudo v2 (texto livre em blocos, sem guardrail). Não é mais usada no código.
 TAREFA_LAUDO_V2 = """\
