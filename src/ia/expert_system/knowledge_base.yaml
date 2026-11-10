@@ -8,6 +8,10 @@
 #   2) calibre os trapézios e os CFs com os dados (distribuição das medidas por
 #      classe) e com a avaliação regras-só x CNN-só x híbrido.
 # As recomendações são orientações gerais de manejo, sem doses nem produtos.
+#
+# Ao editar: texto que contém ": " (dois-pontos seguido de espaço) precisa ficar
+# entre aspas duplas. Sem aspas, o YAML lê "Texto: outro" como um dicionário, e o
+# carregamento (kb.py) recusa a base com ValueError.
 # =============================================================================
 
 config:
@@ -223,7 +227,7 @@ doencas:
     urgencia: alta
     confundivel_com: [tomate_mosaic]
     recomendacoes:
-      - Não há cura: remover e destruir plantas infectadas para reduzir a fonte do vírus.
+      - "Não há cura: remover e destruir plantas infectadas para reduzir a fonte do vírus."
       - Controlar a mosca-branca (mudas sadias, telas, manejo do vetor).
       - Procurar orientação técnica sobre variedades tolerantes e manejo do vetor.
   tomate_mosaic:
@@ -233,7 +237,7 @@ doencas:
     urgencia: alta
     confundivel_com: [tomate_yellow_leaf_curl]
     recomendacoes:
-      - Não há cura: remover e destruir plantas infectadas.
+      - "Não há cura: remover e destruir plantas infectadas."
       - Higienizar mãos e ferramentas e usar sementes certificadas.
       - Procurar orientação técnica sobre variedades resistentes.
   tomate_saudavel:

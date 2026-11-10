@@ -133,3 +133,28 @@ SUSPECT_LEAF_FRACTION = (0.10, 0.95)
 # não são calculadas. PROVISÓRIO: escolhido em 65 imagens de tomate (e conferido em
 # 300, também quase só tomate); batata não foi avaliada.
 MASK_EDGE_CONTACT_MAX = 0.20
+
+# ---------- IA generativa (src/ia/generativa/) ----------
+# Modelo do Gemini usado pela aplicação. A variável de ambiente GEMINI_MODEL tem
+# prioridade (útil se o Google renomear ou aposentar o modelo). Em 09/11/2026 o
+# 3.5 Flash-Lite respondeu em ~1,7 s, enquanto o 3.8 Flash devolveu 503/504.
+LLM_MODEL = "gemini-3.5-flash-lite"
+# Modelo tentado quando o principal está fora do ar (503/504/429 mesmo depois das
+# novas tentativas) ou não existe (404). None desliga a reserva. A variável de
+# ambiente GEMINI_MODEL_RESERVA tem prioridade.
+LLM_MODEL_RESERVA = "gemini-3.8-flash"
+# Tempo máximo de espera por uma resposta da API, em segundos.
+LLM_TIMEOUT_S = 60
+# Erros temporários (429, 5xx, rede) são repetidos até este número de tentativas por
+# modelo, esperando LLM_ESPERA_INICIAL_S, depois o dobro, e assim por diante.
+LLM_TENTATIVAS = 3
+LLM_ESPERA_INICIAL_S = 1.0
+# Respostas já recebidas (não versionado, dentro de rotina_demo/): a mesma pergunta
+# não gasta cota de novo e a demo funciona sem internet para entradas já vistas.
+LLM_CACHE_DIR = os.path.join(DEMO_DIR, "llm_cache")
+# Registro do guardrail do laudo (não versionado): uma linha JSON por laudo, com status
+# (aprovado / corrigido / reprovado), tentativas e violações. Base da visão crítica.
+GUARDRAIL_LOG = os.path.join(DEMO_DIR, "guardrail_log.jsonl")
+# Registro da conversa (não versionado): uma linha JSON por resposta interpretada, com os
+# sintomas aceitos e os descartados pelo guardrail da conversa. Nunca o texto do usuário.
+CONVERSA_LOG = os.path.join(DEMO_DIR, "conversa_log.jsonl")
