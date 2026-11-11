@@ -333,6 +333,25 @@ def test_resposta_sem_acentos_e_corrigida(diag, kb):
     assert "texto sem acentos" in t.chamadas[1][1] and "não tem certeza" in laudo.texto
 
 
+def test_corrigido_so_por_acentos_tela_curta_e_log_completo(diag, kb, tmp_path):
+    from cli.formatacao import formatar_laudo
+    sem = resposta_valida(diag, kb, o_que_encontrou="O sistema nao tem certeza sobre o "
+                                                    "diagnostico.")
+    cliente, _ = cliente_seq(sem, resposta_valida(diag, kb, **ACENTUADO))
+    log = tmp_path / "guardrail_log.jsonl"
+    laudo = gerar_laudo(diag, kb, cliente, log=log)
+    # tela: linha curta, sem o detalhe técnico
+    tela = formatar_laudo(laudo)
+    assert "Guardrail: aprovado (texto revisado automaticamente)" in tela
+    assert "sem acentos" not in tela
+    # log: não muda (status "corrigido", tentativas e a violação completa com o nível)
+    linha = json.loads(log.read_text(encoding="utf-8"))
+    assert linha["status_guardrail"] == "corrigido" and linha["tentativas"] == 2
+    assert linha["violacoes"] == [[{"violacao": 'texto sem acentos ("nao", "diagnostico"); '
+                                                "escreva em português com acentos",
+                                    "nivel": "qualidade"}], []]
+
+
 # ------------------------------------------------- níveis: segurança x qualidade
 SEM_ACENTO = dict(o_que_encontrou="O sistema nao tem certeza sobre o diagnostico.")
 AVISO_ACENTO = ('texto sem acentos ("nao", "diagnostico"); escreva em português com acentos')

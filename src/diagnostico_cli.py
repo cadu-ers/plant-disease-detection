@@ -5,7 +5,7 @@ Sorteia uma imagem do split de TESTE (data_split/split_manifest.csv), mostra o d
 (CNN + medidas da folha + sistema especialista) SEM revelar o arquivo nem a classe real, e só
 depois de um Enter mostra a comparação com a classe real.
 
-Uso (na raiz do repositório, com o Python 3.12 do PATH):
+Uso (na raiz do repositório, com o Python 3.11 do PATH):
     python src/diagnostico_cli.py              # com o laudo da IA generativa (Gemini)
     python src/diagnostico_cli.py --sem-llm    # só o sistema especialista, sem API
     python src/diagnostico_cli.py --seed N     # repete o sorteio da seed N (mostrada na revelação)
@@ -119,7 +119,7 @@ def principal(argv=()):
         from ia.generativa.laudo import criar_gerador_de_laudo
     except ImportError as erro:
         print(f"Não foi possível importar '{erro.name or erro}'. Use o Python do projeto "
-              "(3.12 do PATH, com tensorflow e pyyaml); nada será instalado automaticamente.",
+              "(3.11 do PATH, com tensorflow e pyyaml); nada será instalado automaticamente.",
               file=sys.stderr)
         return 1
     extras = {} if opcoes.seed is None else {"gerar_seed": lambda: opcoes.seed}

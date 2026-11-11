@@ -21,8 +21,8 @@ como o preprocessing.py a grava em data_processed/ (cv2.imencode; extensão fixa
 inferência), depois decodificada em RGB e redimensionada (bilinear) para 160x160, em
 float 0-255. O preprocess_input da MobileNetV2 já está dentro do modelo.
 
-LIMITAÇÃO DOS PESOS LOCAIS: ver AVISO_PESOS_LOCAIS. Os pesos atuais não servem para
-avaliar a CNN no split de teste.
+Uma imagem na CLI é só uma demonstração, não uma avaliação da CNN: ver
+NOTA_CNN_DEMONSTRACAO.
 """
 
 import json
@@ -39,12 +39,12 @@ EXTENSAO_PADRAO = ".jpg"
 EXTENSOES_SUPORTADAS = (".jpg", ".jpeg", ".png")
 RAIZ_REPOSITORIO = Path(__file__).resolve().parents[2]
 
-AVISO_PESOS_LOCAIS = (
-    "Aviso sobre a CNN: os pesos locais (models/plant_disease_model.keras) foram gravados "
-    "antes da divisão 70/15/15, então o modelo pode ter visto imagens do split de teste "
-    "e parecer melhor do que é. Eles também foram treinados com a segmentação antiga, "
-    "diferente da atual, o que pode piorar as previsões. Não use este resultado para "
-    "avaliar a CNN."
+# Nota (não é aviso de problema): mostrada na revelação da CLI quando a CNN foi usada.
+NOTA_CNN_DEMONSTRACAO = (
+    "Nota sobre a CNN: os pesos foram treinados depois da divisão 70/15/15 e com a "
+    "segmentação atual. Esta comparação usa UMA imagem e é só uma demonstração, não uma "
+    "avaliação da CNN: a avaliação completa no conjunto de teste está nos relatórios do "
+    "projeto (reports/ia/LEIAME.md)."
 )
 
 
