@@ -1,7 +1,7 @@
 """Sorteio de uma imagem do split de TESTE para a demonstração.
 
 Lê data_split/split_manifest.csv UMA vez (ao criar o SorteadorTeste) e sorteia só linhas
-do split "test", usando SÓ a coluna original_path. O processed_path (segmentação antiga)
+do split "test", usando SÓ a coluna original_path. O processed_path (imagem já processada)
 nunca é usado nem guardado. Não varre pastas, não copia, não move e não baixa imagens.
 
     sorteador = SorteadorTeste()                 # lê o manifest uma vez por sessão

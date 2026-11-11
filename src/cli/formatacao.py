@@ -25,7 +25,9 @@ from pathlib import Path
 
 from aplicacao.pipeline import AVISO_CF
 from common.config import MIN_LESION_AREA_PX, SMALL_LESION_MAX_RATIO
+from ia.generativa.guardrail import so_qualidade
 from ia.generativa.prompts import TITULOS_LAUDO
+from ia.inferencia import NOTA_CNN_DEMONSTRACAO
 
 LARGURA = 78
 
@@ -355,9 +357,7 @@ def formatar_revelacao(imagem, diag, comparacao, gravacao, seed, kb, raiz=None):
             linhas.append(_campo("Pasta criada", _caminho_curto(gravacao.pasta, raiz), quebrar=False))
     linhas.append(_campo("Seed", f"{seed} (identifica este sorteio)"))
     if diag.top3_cnn:
-        linhas.append(_paragrafo(
-            "Lembrete: esta comparação é só uma demonstração, não uma avaliação da CNN: os pesos "
-            "locais podem ter visto imagens do teste (veja o aviso).", recuo=0))
+        linhas.append(_paragrafo(NOTA_CNN_DEMONSTRACAO, recuo=0))
     return "\n".join(linhas)
 
 
@@ -394,11 +394,18 @@ def formatar_guardrail(laudo):
     """Linha do guardrail (ia/generativa/guardrail.py), ou "" quando ele não rodou.
 
     As violações são textos curtos gerados pelo código (nomes de campo, índices e nomes de
-    doença da base), nunca texto livre do LLM: podem aparecer antes do Enter."""
+    doença da base), nunca texto livre do LLM: podem aparecer antes do Enter.
+
+    Corrigido só por violações de QUALIDADE (falta de acentos): linha curta, sem o detalhe
+    técnico. Com alguma de SEGURANÇA, a lista completa (inclusive as de qualidade)."""
     status = getattr(laudo, "status_guardrail", None)
     violacoes = "; ".join(getattr(laudo, "violacoes", ()) or ())
     if status == "aprovado":
         texto = f"Guardrail: aprovado na {laudo.tentativas}a tentativa"
+    elif status == "corrigido" and so_qualidade(getattr(laudo, "violacoes", ())):
+        # só faltavam acentos (qualidade): detalhe técnico que não interessa ao agricultor.
+        # O log (guardrail_log.jsonl) continua com "corrigido" e a violação completa.
+        texto = "Guardrail: aprovado (texto revisado automaticamente)"
     elif status == "corrigido":
         texto = f"Guardrail: corrigido na {laudo.tentativas}a tentativa (violações: {violacoes})"
     elif status == "aprovado_com_aviso":

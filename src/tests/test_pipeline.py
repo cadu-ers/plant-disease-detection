@@ -20,7 +20,7 @@ from aplicacao.pipeline import (
 )
 from aplicacao.sorteio import AmostraSorteada, ImagemSorteada
 from ia.expert_system import carregar_kb
-from ia.inferencia import AVISO_PESOS_LOCAIS, ModeloIndisponivel
+from ia.inferencia import NOTA_CNN_DEMONSTRACAO, ModeloIndisponivel
 from processamento_imagens.preprocessing import segment_image
 
 SRC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -76,7 +76,7 @@ def test_sem_preditor_roda_so_com_medidas_e_regras(folha, kb):
     assert r.status == "ok" and r.modo == "sem_cnn" and r.top3_cnn == ()
     assert not r.resultado.usou_cnn and r.medidas is not None
     assert any("sem CNN" in a for a in r.avisos)
-    assert AVISO_PESOS_LOCAIS not in r.avisos                      # só aparece quando a CNN é usada
+    assert NOTA_CNN_DEMONSTRACAO not in r.avisos                   # a nota nunca é um aviso
 
 
 def test_inconclusivo_nunca_vira_saudavel(kb):
@@ -138,12 +138,13 @@ def test_cnn_com_falha_cai_para_o_modo_sem_cnn(folha, kb, preditor, trecho):
     r = diagnosticar_amostra(*folha, "test", preditor=preditor, kb=kb)
     assert r.status == "ok" and r.modo == "sem_cnn" and r.top3_cnn == ()
     assert any(trecho in a for a in r.avisos) and any("sem CNN" in a for a in r.avisos)
-    assert not r.resultado.usou_cnn and AVISO_PESOS_LOCAIS not in r.avisos
+    assert not r.resultado.usou_cnn and NOTA_CNN_DEMONSTRACAO not in r.avisos
 
 
-def test_cnn_usada_traz_top3_e_o_aviso_dos_pesos(folha, kb):
+def test_cnn_usada_traz_top3_sem_aviso_falso_dos_pesos(folha, kb):
     r = diagnosticar_amostra(*folha, "test", preditor=PreditorFalso(requeima()), kb=kb)
-    assert r.modo == "com_cnn" and AVISO_PESOS_LOCAIS in r.avisos
+    assert r.modo == "com_cnn" and NOTA_CNN_DEMONSTRACAO not in r.avisos
+    assert not any("pesos" in a for a in r.avisos)               # a nota só vai à revelação
     assert [t[0] for t in r.top3_cnn] == ["Tomato_Late_blight", "Tomato_Early_blight",
                                           "Tomato__Target_Spot"]
     assert r.top3_cnn[0][1] == kb.doencas["tomate_late_blight"].nome

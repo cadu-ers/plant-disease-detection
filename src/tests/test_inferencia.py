@@ -22,7 +22,7 @@ from common.config import MODEL_PATH
 from ia import inferencia
 from ia.expert_system import carregar_kb, diagnosticar
 from ia.inferencia import (
-    AVISO_PESOS_LOCAIS, ModeloIndisponivel, PreditorCNN, carregar_preditor, preparar_entrada,
+    NOTA_CNN_DEMONSTRACAO, ModeloIndisponivel, PreditorCNN, carregar_preditor, preparar_entrada,
 )
 
 SRC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -104,10 +104,16 @@ def test_preditor_falso_alimenta_o_contrato_e_o_motor():
     assert resultado.cultura == "tomate" and resultado.usou_cnn
 
 
-def test_aviso_dos_pesos_cita_as_duas_limitacoes():
-    assert "70/15/15" in AVISO_PESOS_LOCAIS and "split de teste" in AVISO_PESOS_LOCAIS
-    assert "segmentação antiga" in AVISO_PESOS_LOCAIS
-    assert inferencia.__doc__ and "LIMITAÇÃO DOS PESOS LOCAIS" in inferencia.__doc__
+def test_nota_da_cnn_diz_so_o_que_e_verdade():
+    nota = " ".join(NOTA_CNN_DEMONSTRACAO.split())
+    assert "treinados depois da divisão 70/15/15 e com a segmentação atual" in nota
+    assert "UMA imagem" in nota and "não uma avaliação da CNN" in nota
+    assert "reports/ia/LEIAME.md" in nota
+    # a afirmação antiga (falsa) não volta
+    for falso in ("pode ter visto", "podem ter visto", "segmentação antiga", "antes da divisão"):
+        assert falso not in nota and falso not in inferencia.__doc__, falso
+    assert "NOTA_CNN_DEMONSTRACAO" in inferencia.__doc__
+    NOTA_CNN_DEMONSTRACAO.encode("cp850")                          # cabe no console do Windows
 
 
 # ------------------------------------------------------------ com TensorFlow e o modelo

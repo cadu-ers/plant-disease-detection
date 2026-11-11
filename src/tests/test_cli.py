@@ -26,7 +26,7 @@ from cli import menu
 from cli.menu import Dependencias, executar
 from ia.expert_system import carregar_kb
 from common.config import MIN_LESION_AREA_PX
-from ia.inferencia import AVISO_PESOS_LOCAIS, ModeloIndisponivel
+from ia.inferencia import NOTA_CNN_DEMONSTRACAO, ModeloIndisponivel
 
 SRC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CLASSES = list(carregar_class_names())
@@ -165,7 +165,9 @@ def test_secoes_trazem_o_que_o_plano_promete(projeto, kb):
     antes = t.antes_do_enter()
     assert "softmax" in antes and "não é confiança calibrada" in antes        # top 3
     assert "Requeima do tomateiro" in antes and "70.0%" in antes
-    assert "Aviso sobre a CNN" in antes and AVISO_PESOS_LOCAIS.split(":")[0] in antes
+    # a nota da CNN não é aviso: não aparece antes do Enter, só na revelação
+    assert "Aviso sobre a CNN" not in antes and "Nota sobre a CNN" not in antes
+    assert " ".join(NOTA_CNN_DEMONSTRACAO.split()) in t.depois_do_enter()
     assert "cultura inferida pela CNN: tomate." in antes
     assert "a CLI não pergunta" in antes                                       # pendências
     assert "não é uma probabilidade calibrada" in antes                        # CF
@@ -413,7 +415,7 @@ def test_modelo_indisponivel_segue_sem_cnn_com_aviso_e_nao_tenta_de_novo(projeto
     antes = t.antes_do_enter()
     assert "AVISO: a CNN não está disponível" in antes and "SEM a CNN" in antes
     assert "A CNN não foi usada nesta análise" in antes
-    assert "softmax" not in antes and AVISO_PESOS_LOCAIS not in antes
+    assert "softmax" not in antes and "Nota sobre a CNN" not in t.texto     # sem CNN, sem nota
     assert "CNN (1a opção): não utilizada nesta análise" in t.depois_do_enter() and "não utilizada nesta análise" in t.texto
     assert t.texto.count("AVISO: a CNN não está disponível") == 1
 
@@ -796,6 +798,32 @@ def test_linha_do_guardrail_aprovado_e_corrigido():
             "Ácaro-rajado (Two-spotted spider mite); usa \"%\"") in texto
     assert "Ácaro-rajado" in corrigido                      # nome com hífen não é quebrado
     assert "    O que o sistema encontrou:" in corrigido.splitlines()   # o laudo do LLM aparece
+
+
+def _sem_acentos():
+    from ia.generativa.guardrail import Violacao
+    return Violacao('texto sem acentos ("nao", "diagnostico"); escreva em português com '
+                    "acentos", nivel="qualidade", curto="texto sem acentos")
+
+
+def test_corrigido_so_por_acentos_mostra_a_linha_curta_sem_detalhe():
+    tela = fmt.formatar_laudo(_laudo(texto=LAUDO_V2, status_guardrail="corrigido",
+                                     tentativas=2, violacoes=(_sem_acentos(),)))
+    assert "Guardrail: aprovado (texto revisado automaticamente)" in tela.splitlines()
+    assert "sem acentos" not in tela and "violações" not in tela and "corrigido" not in tela
+    assert "    O que o sistema encontrou:" in tela.splitlines()      # o laudo do LLM aparece
+    tela.encode("cp850")
+
+
+def test_corrigido_com_seguranca_e_qualidade_mantem_a_lista_completa():
+    from ia.generativa.guardrail import Violacao
+    seguranca = Violacao('usa "%" (força da evidência não é porcentagem)')
+    tela = fmt.formatar_laudo(_laudo(texto=LAUDO_V2, status_guardrail="corrigido",
+                                     tentativas=2, violacoes=(_sem_acentos(), seguranca)))
+    texto = " ".join(tela.split())
+    assert "Guardrail: corrigido na 2a tentativa (violações: texto sem acentos" in texto
+    assert 'usa "%" (força da evidência não é porcentagem))' in texto
+    assert "texto revisado automaticamente" not in texto
 
 
 def test_guardrail_reprovado_mostra_o_texto_do_sistema_especialista():

@@ -30,7 +30,7 @@ from aplicacao.contrato import (
     ContratoInvalido, carregar_class_names, montar_cnn_prior, montar_fatos,
 )
 from ia.expert_system import carregar_kb, chave_canonica, diagnosticar, explicar, proxima_pergunta
-from ia.inferencia import AVISO_PESOS_LOCAIS, ModeloIndisponivel
+from ia.inferencia import ModeloIndisponivel
 from processamento_imagens.medidas_lesao import MascaraInvalida, avaliar_mascara, medir_lesoes
 
 AVISO_CF = ("O CF (fator de certeza) do sistema especialista não é uma probabilidade "
@@ -199,8 +199,8 @@ def diagnosticar_amostra(segmentada, mascara, divisao, preditor=None, kb=None,
     avisos = list(fatos.avisos)
     if aviso_cnn:
         avisos.append(aviso_cnn)
-    if probabilidades is not None:
-        avisos.append(AVISO_PESOS_LOCAIS)
+    # A nota de que a comparação é só uma demonstração (NOTA_CNN_DEMONSTRACAO) não é um
+    # aviso de problema: aparece só na revelação (cli/formatacao.formatar_revelacao).
     if resultado.cultura is None:
         avisos.append("cultura desconhecida: o diagnóstico considera as 13 classes.")
     elif fatos.cultura_origem == "a_inferir_pela_cnn":
